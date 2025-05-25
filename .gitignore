@@ -1,4 +1,8 @@
-# Python cache files
+# Database files
+project_runner.db
+*.db
+
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
@@ -41,7 +45,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# Virtual environments
+# Environments
 .env
 .venv
 env/
@@ -50,14 +54,14 @@ ENV/
 env.bak/
 venv.bak/
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS files
+# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -66,7 +70,15 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
+# Logs
+*.log
+
 # Temporary files
 *.tmp
 *.temp
-*.log 
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup 
