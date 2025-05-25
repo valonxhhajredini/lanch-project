@@ -633,7 +633,7 @@ class ProjectSidebar:
             text="+ Create New Project",
             command=self._on_create_new,
             font=("Helvetica", 10, "bold"),
-            bg="#007bff",
+            bg="#28a745",
             fg="white",
             relief=tk.FLAT,
             padx=20,

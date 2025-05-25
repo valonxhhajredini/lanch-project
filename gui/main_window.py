@@ -77,7 +77,7 @@ class MainWindow:
             text="+ Create New Project",
             command=self._show_create_dialog,
             font=("Helvetica", 14, "bold"),
-            bg="#007bff",
+            bg="#28a745",
             fg="white",
             padx=40,
             pady=15,
@@ -158,6 +158,7 @@ class MainWindow:
                 variable=selected_type,
                 value=project_type,
                 font=("Helvetica", 11),
+                fg="#333333",
                 bg="white",
                 anchor=tk.W
             )
@@ -181,7 +182,7 @@ class MainWindow:
             text="Create Project",
             command=lambda: self._create_project_from_dialog(dialog, selected_type.get()),
             font=("Helvetica", 10, "bold"),
-            bg="#007bff",
+            bg="#28a745",
             fg="white",
             padx=20,
             pady=8

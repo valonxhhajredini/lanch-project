@@ -5,11 +5,13 @@ A desktop GUI application for running Angular, Laravel, and custom development p
 ## Features
 
 - **Multi-Instance Support**: Create and manage multiple project instances simultaneously
-- **Tabbed Interface**: Clean tabbed UI for switching between different projects
+- **Sidebar Interface**: Clean sidebar with project list and visual status indicators
+- **Status Indicators**: Color-coded status (🟢 Running, 🔴 Stopped, 🟡 Starting, ⚪ Ready)
 - **Project Type Support**: Angular, Laravel, and Custom projects
 - **Real-time Output**: Live streaming of command output with proper threading
 - **Port Management**: Automatic clearing of conflicting processes on ports 4200 (Angular) and 8000 (Laravel)
 - **Process Control**: Independent start and stop commands for each instance
+- **Dashboard Design**: Modern, intuitive interface with welcome screen
 - **Cross-platform**: Works on macOS, Linux, and Windows
 
 ## Project Structure
@@ -47,19 +49,22 @@ Or test the imports first:
 python3 test_imports.py
 ```
 
-1. Click on the "+ Create New" tab to create a new project instance
-2. Select project type (Angular/Laravel/Custom) and click "Create Instance"
-3. Configure the working directory for your project
-4. Enter or use pre-filled command based on project type
-5. Click "Run Command" to start the project
-6. Use "Stop Command" to terminate running processes
-7. Create multiple instances to run different projects simultaneously
+1. Click "+ Create New Project" in the sidebar or welcome screen
+2. Select project type (Angular/Laravel/Custom) in the dialog
+3. Click "Create Project" to add it to your sidebar
+4. Configure the working directory for your project
+5. Enter or use pre-filled command based on project type
+6. Click "Run Command" to start the project (status turns 🟢 green)
+7. Use "Stop Command" to terminate running processes (status turns 🔴 red)
+8. Create multiple instances and switch between them using the sidebar
+9. Monitor all project statuses at a glance with color-coded indicators
 
 ## Key Achievements
 
 🎯 **Modular Architecture**: Transformed 446-line monolithic file into clean, maintainable modules  
 📏 **Size Compliance**: All files under 500-line limit  
-🔧 **Multi-Instance Support**: Enhanced with tabbed interface for simultaneous project management  
+🔧 **Multi-Instance Support**: Enhanced with sidebar interface for simultaneous project management  
+🎨 **Modern UI Design**: Sidebar with color-coded status indicators and dashboard layout  
 📚 **Well Documented**: Comprehensive README and planning documentation  
 🧪 **Test Ready**: Isolated functions ready for unit testing  
 🚀 **Production Ready**: Clean, professional codebase structure  
