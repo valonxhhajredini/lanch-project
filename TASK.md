@@ -1,99 +1,103 @@
-# Multi-Instance Project Manager - Task Definition
+# Multi-Instance Project Manager - Task Definition (Updated Design)
 
 ## Overview
-Transform the current single-project runner into a multi-instance project manager with tabbed interface.
+Transform the current tabbed interface into a sidebar-based project manager with visual status indicators.
 
 ## User Story
 As a developer, I want to:
-1. Create multiple project instances in one application window
-2. Run different projects (Laravel, Angular, Custom) simultaneously
-3. Manage each project independently with its own output and controls
-4. Switch between projects using tabs
-5. Have a clean interface to create new instances
+1. See all my project instances in a sidebar list
+2. Visual status indicators (green=running, red=stopped, yellow=starting)
+3. Click on projects in the sidebar to switch between them
+4. Create new instances with a prominent "+" button
+5. Have a clean, dashboard-like interface
 
-## Current State
-- Single project runner with one output window
-- Project type selection changes the command for current instance
-- One set of controls (Run/Stop) for one project
-
-## Target State
-- Multi-tabbed interface with project instances
-- "Create New Instance" landing page/tab
-- Each tab contains:
-  - Project type selection (Laravel/Angular/Custom)
-  - Directory selector
-  - Command entry (auto-filled based on project type)
-  - Output display
-  - Run/Stop controls
+## Current State (V6)
+- Tabbed interface with "+ Create New" tab
+- Each tab contains project configuration and output
 - Independent process management per tab
+
+## Target State (V7 - Sidebar Design)
+- **Left Sidebar**: Project list with status indicators
+- **Main Area**: Selected project's configuration and output
+- **Status Colors**: 
+  - 🟢 Green: Project running
+  - 🔴 Red: Project stopped
+  - 🟡 Yellow: Project starting/stopping
+  - ⚪ Gray: Project created but never run
 
 ## Technical Requirements
 
 ### UI Structure
 ```
 Main Window
-├── Tab Bar
-│   ├── "+" (Create New Instance)
-│   ├── "Laravel Project" (Instance 1)
-│   ├── "Angular App" (Instance 2)
-│   └── "Custom Script" (Instance 3)
-└── Tab Content Area
+├── Left Sidebar (200px width)
+│   ├── "Create New Project" Button
+│   ├── Project List
+│   │   ├── [🟢] Laravel Project 1
+│   │   ├── [🔴] Angular App 1  
+│   │   ├── [🟡] Custom Script 1
+│   │   └── [⚪] Laravel Project 2
+│   └── Status Legend
+└── Main Content Area
     ├── Project Configuration (top)
     ├── Output Display (middle)
     └── Control Buttons (bottom)
 ```
 
 ### Features
-1. **Create New Instance Tab**
-   - Welcome message
-   - Project type selection
-   - "Create Instance" button
-   - Auto-generates tab name based on project type
+1. **Sidebar Project List**
+   - Clickable project items
+   - Color-coded status indicators
+   - Project type icons
+   - Delete/rename context menu
 
-2. **Project Instance Tabs**
-   - Closeable tabs (except create new)
-   - Independent process handlers
-   - Unique tab names (Laravel Project 1, Laravel Project 2, etc.)
-   - Tab context menu (rename, close)
+2. **Status Indicators**
+   - Real-time status updates
+   - Color coding for quick visual feedback
+   - Status text (Running, Stopped, Starting, etc.)
 
-3. **Process Management**
-   - Each tab has its own ProcessHandler
-   - Independent port management
-   - Simultaneous project execution
-   - Proper cleanup on tab close
+3. **Main Content Area**
+   - Shows selected project's interface
+   - Welcome screen when no project selected
+   - Same functionality as current tabs
 
 ### Implementation Plan
-1. Create tabbed interface using ttk.Notebook
-2. Refactor MainWindow to manage multiple instances
-3. Create InstanceTab class for individual project tabs
-4. Implement CreateInstanceTab for new project creation
-5. Update process management for multi-instance support
-6. Add tab management (create, close, rename)
+1. Replace ttk.Notebook with custom sidebar + main area layout
+2. Create ProjectSidebar widget with status indicators
+3. Create ProjectListItem widget for individual projects
+4. Implement status management and color updates
+5. Add project selection and switching logic
+6. Enhance with icons and better visual design
 
 ## Acceptance Criteria
 - [x] User can create multiple project instances
-- [x] Each instance runs independently
-- [x] Tabs show project type and status
+- [x] Each instance runs independently  
+- [ ] Sidebar shows all projects with status indicators
+- [ ] Color-coded status (green=running, red=stopped, etc.)
+- [ ] Click to switch between projects
 - [x] Can run multiple projects simultaneously
-- [ ] Clean tab management (create/close) - *Partially implemented*
-- [x] Proper process cleanup on tab close
+- [ ] Clean project management (create/delete)
+- [x] Proper process cleanup on project deletion
 - [x] Intuitive user interface
 
-## Implementation Status: ✅ COMPLETED
+## Implementation Status: 🔄 IN PROGRESS (V7 - Sidebar Design)
 
-### What's Working
-- ✅ Tabbed interface with "+ Create New" tab
-- ✅ Welcome screen with project type selection
-- ✅ Independent project instances with unique tabs
-- ✅ Simultaneous execution of multiple projects
-- ✅ Independent process handlers per tab
-- ✅ Proper port management per instance
-- ✅ Clean UI with project-specific configurations
-- ✅ Automatic tab naming (Laravel Project 1, Angular Project 2, etc.)
+### What's Working (V6)
+- ✅ Multi-instance support
+- ✅ Independent process management
+- ✅ Real-time output streaming
+- ✅ Port management per instance
+
+### V7 Goals - Sidebar Design
+- [ ] Left sidebar with project list
+- [ ] Color-coded status indicators
+- [ ] Project selection and switching
+- [ ] Enhanced visual design
+- [ ] Better user experience
 
 ### Future Enhancements
-- [ ] Tab closing functionality (right-click context menu)
-- [ ] Tab renaming capability
-- [ ] Drag and drop tab reordering
-- [ ] Tab status indicators (running/stopped/error)
-- [ ] Save/restore session with multiple tabs 
+- [ ] Project type icons (Laravel, Angular, Custom)
+- [ ] Right-click context menu (rename, delete, duplicate)
+- [ ] Drag and drop project reordering
+- [ ] Project templates and quick setup
+- [ ] Save/restore workspace sessions 

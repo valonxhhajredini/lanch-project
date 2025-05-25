@@ -4,7 +4,7 @@ Custom widgets and UI components for Project Runner App.
 
 import tkinter as tk
 from tkinter import scrolledtext, ttk
-from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, TAB_CONFIG
+from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG
 
 
 class OutputTextWidget:
@@ -441,16 +441,16 @@ class ProjectInstanceTab:
         self.button_frame = tk.Frame(self.main_frame)
         self.button_frame.pack(pady=10, padx=10, fill=tk.X, side=tk.BOTTOM)
         
-    def get_tab_title(self):
-        """Generate tab title for this instance."""
-        base_name = TAB_CONFIG["default_names"].get(self.project_type, "Project")
+    def get_project_name(self):
+        """Generate project name for this instance."""
+        base_name = PROJECT_CONFIG["default_names"].get(self.project_type, "Project")
         if self.instance_number > 1:
             title = f"{base_name} {self.instance_number}"
         else:
             title = base_name
             
         # Truncate if too long
-        max_length = TAB_CONFIG["max_tab_title_length"]
+        max_length = PROJECT_CONFIG["max_name_length"]
         if len(title) > max_length:
             title = title[:max_length-3] + "..."
             
@@ -459,4 +459,268 @@ class ProjectInstanceTab:
     def set_callbacks(self, run_callback, stop_callback):
         """Set the run and stop callbacks for this instance."""
         self.control_buttons.run_callback = run_callback
-        self.control_buttons.stop_callback = stop_callback 
+        self.control_buttons.stop_callback = stop_callback
+
+
+class ProjectListItem:
+    """Individual project item in the sidebar."""
+    
+    def __init__(self, parent, project_id, project_name, project_type, click_callback=None):
+        self.parent = parent
+        self.project_id = project_id
+        self.project_name = project_name
+        self.project_type = project_type
+        self.click_callback = click_callback
+        self.status = "created"
+        self.selected = False
+        
+        self.colors = UI_CONFIG["colors"]
+        self.sidebar_colors = UI_CONFIG["sidebar"]
+        
+        self._create_widget()
+        
+    def _create_widget(self):
+        """Create the project list item widget."""
+        self.frame = tk.Frame(
+            self.parent,
+            bg=self.sidebar_colors["bg"],
+            relief=tk.FLAT,
+            borderwidth=1,
+            height=UI_CONFIG["dimensions"]["sidebar_item_height"]
+        )
+        self.frame.pack(fill=tk.X, padx=5, pady=2)
+        self.frame.pack_propagate(False)  # Maintain fixed height
+        
+        # Bind click events
+        self.frame.bind("<Button-1>", self._on_click)
+        self.frame.bind("<Enter>", self._on_enter)
+        self.frame.bind("<Leave>", self._on_leave)
+        
+        # Status indicator
+        self.status_label = tk.Label(
+            self.frame,
+            text=STATUS_CONFIG["indicators"]["created"],
+            font=("Helvetica", 16),
+            fg=STATUS_CONFIG["colors"]["created"],
+            bg=self.sidebar_colors["bg"],
+            width=2
+        )
+        self.status_label.pack(side=tk.LEFT, padx=(10, 5), pady=10)
+        self.status_label.bind("<Button-1>", self._on_click)
+        
+        # Project info frame
+        info_frame = tk.Frame(self.frame, bg=self.sidebar_colors["bg"])
+        info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 10), pady=5)
+        info_frame.bind("<Button-1>", self._on_click)
+        
+        # Project name
+        self.name_label = tk.Label(
+            info_frame,
+            text=self.project_name,
+            font=("Helvetica", 11, "bold"),
+            fg=self.colors["label_fg"],
+            bg=self.sidebar_colors["bg"],
+            anchor=tk.W
+        )
+        self.name_label.pack(fill=tk.X)
+        self.name_label.bind("<Button-1>", self._on_click)
+        
+        # Project type and status
+        self.status_text_label = tk.Label(
+            info_frame,
+            text=f"{self.project_type} • {STATUS_CONFIG['text']['created']}",
+            font=("Helvetica", 9),
+            fg="#666666",
+            bg=self.sidebar_colors["bg"],
+            anchor=tk.W
+        )
+        self.status_text_label.pack(fill=tk.X)
+        self.status_text_label.bind("<Button-1>", self._on_click)
+        
+    def _on_click(self, event):
+        """Handle click on project item."""
+        if self.click_callback:
+            self.click_callback(self.project_id)
+            
+    def _on_enter(self, event):
+        """Handle mouse enter."""
+        if not self.selected:
+            self._update_background(self.sidebar_colors["hover_bg"])
+            
+    def _on_leave(self, event):
+        """Handle mouse leave."""
+        if not self.selected:
+            self._update_background(self.sidebar_colors["bg"])
+            
+    def _update_background(self, color):
+        """Update background color of all components."""
+        self.frame.config(bg=color)
+        self.status_label.config(bg=color)
+        for child in self.frame.winfo_children():
+            if isinstance(child, tk.Frame):
+                child.config(bg=color)
+                for grandchild in child.winfo_children():
+                    if isinstance(grandchild, tk.Label):
+                        grandchild.config(bg=color)
+                        
+    def set_selected(self, selected):
+        """Set the selection state."""
+        self.selected = selected
+        if selected:
+            self._update_background(self.sidebar_colors["selected_bg"])
+        else:
+            self._update_background(self.sidebar_colors["bg"])
+            
+    def update_status(self, status):
+        """Update the project status."""
+        self.status = status
+        
+        # Update status indicator
+        self.status_label.config(
+            text=STATUS_CONFIG["indicators"][status],
+            fg=STATUS_CONFIG["colors"][status]
+        )
+        
+        # Update status text
+        self.status_text_label.config(
+            text=f"{self.project_type} • {STATUS_CONFIG['text'][status]}"
+        )
+
+
+class ProjectSidebar:
+    """Sidebar containing project list and controls."""
+    
+    def __init__(self, parent, create_callback=None, select_callback=None):
+        self.parent = parent
+        self.create_callback = create_callback
+        self.select_callback = select_callback
+        self.project_items = {}
+        self.selected_project_id = None
+        
+        self.colors = UI_CONFIG["colors"]
+        self.sidebar_colors = UI_CONFIG["sidebar"]
+        
+        self._create_widgets()
+        
+    def _create_widgets(self):
+        """Create the sidebar widgets."""
+        # Main sidebar frame
+        self.sidebar_frame = tk.Frame(
+            self.parent,
+            bg=self.sidebar_colors["bg"],
+            width=UI_CONFIG["dimensions"]["sidebar_width"],
+            relief=tk.RAISED,
+            borderwidth=1
+        )
+        self.sidebar_frame.pack(side=tk.LEFT, fill=tk.Y)
+        self.sidebar_frame.pack_propagate(False)  # Maintain fixed width
+        
+        # Header
+        header_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_colors["bg"])
+        header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        tk.Label(
+            header_frame,
+            text="Projects",
+            font=("Helvetica", 14, "bold"),
+            fg=self.colors["label_fg"],
+            bg=self.sidebar_colors["bg"]
+        ).pack(anchor=tk.W)
+        
+        # Create new project button
+        self.create_button = tk.Button(
+            self.sidebar_frame,
+            text="+ Create New Project",
+            command=self._on_create_new,
+            font=("Helvetica", 10, "bold"),
+            bg="#007bff",
+            fg="white",
+            relief=tk.FLAT,
+            padx=20,
+            pady=8
+        )
+        self.create_button.pack(fill=tk.X, padx=10, pady=(5, 15))
+        
+        # Scrollable project list
+        self.list_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_colors["bg"])
+        self.list_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
+        
+        # Status legend
+        legend_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_colors["bg"])
+        legend_frame.pack(fill=tk.X, padx=10, pady=10, side=tk.BOTTOM)
+        
+        tk.Label(
+            legend_frame,
+            text="Status:",
+            font=("Helvetica", 8, "bold"),
+            fg="#666666",
+            bg=self.sidebar_colors["bg"]
+        ).pack(anchor=tk.W)
+        
+        for status, color in [("running", "🟢 Running"), ("stopped", "🔴 Stopped"), 
+                             ("starting", "🟡 Starting"), ("created", "⚪ Ready")]:
+            tk.Label(
+                legend_frame,
+                text=color,
+                font=("Helvetica", 8),
+                fg="#666666",
+                bg=self.sidebar_colors["bg"]
+            ).pack(anchor=tk.W)
+            
+    def _on_create_new(self):
+        """Handle create new project button click."""
+        if self.create_callback:
+            self.create_callback()
+            
+    def add_project(self, project_id, project_name, project_type):
+        """Add a new project to the sidebar."""
+        item = ProjectListItem(
+            self.list_frame,
+            project_id,
+            project_name,
+            project_type,
+            self._on_project_select
+        )
+        self.project_items[project_id] = item
+        
+        # Auto-select if it's the first project
+        if len(self.project_items) == 1:
+            self.select_project(project_id)
+            
+    def _on_project_select(self, project_id):
+        """Handle project selection."""
+        self.select_project(project_id)
+        if self.select_callback:
+            self.select_callback(project_id)
+            
+    def select_project(self, project_id):
+        """Select a project in the sidebar."""
+        # Deselect current
+        if self.selected_project_id and self.selected_project_id in self.project_items:
+            self.project_items[self.selected_project_id].set_selected(False)
+            
+        # Select new
+        if project_id in self.project_items:
+            self.project_items[project_id].set_selected(True)
+            self.selected_project_id = project_id
+            
+    def update_project_status(self, project_id, status):
+        """Update the status of a project."""
+        if project_id in self.project_items:
+            self.project_items[project_id].update_status(status)
+            
+    def remove_project(self, project_id):
+        """Remove a project from the sidebar."""
+        if project_id in self.project_items:
+            self.project_items[project_id].frame.destroy()
+            del self.project_items[project_id]
+            
+            # Select another project if this was selected
+            if self.selected_project_id == project_id:
+                self.selected_project_id = None
+                if self.project_items:
+                    # Select the first available project
+                    first_id = next(iter(self.project_items))
+                    self.select_project(first_id)
+                    if self.select_callback:
+                        self.select_callback(first_id) 

@@ -23,7 +23,7 @@ PROJECT_TYPES = {
 
 # UI Configuration
 UI_CONFIG = {
-    "window_title": "Project Runner App V6 - Multi-Instance",
+    "window_title": "Project Runner App V7 - Sidebar Design",
     "colors": {
         "label_fg": "black",
         "label_bg": "#F0F0F0",
@@ -39,7 +39,15 @@ UI_CONFIG = {
     "dimensions": {
         "output_height": 15,
         "output_width": 70,
-        "command_entry_width": 60
+        "command_entry_width": 60,
+        "sidebar_width": 250,
+        "sidebar_item_height": 60
+    },
+    "sidebar": {
+        "bg": "#f8f9fa",
+        "selected_bg": "#e3f2fd",
+        "hover_bg": "#f0f0f0",
+        "border_color": "#dee2e6"
     }
 }
 
@@ -72,13 +80,37 @@ MESSAGES = {
     "instance_created": "Instance created successfully! Configure your project settings above."
 }
 
-# Tab management settings
-TAB_CONFIG = {
-    "create_tab_title": "+ Create New",
-    "max_tab_title_length": 20,
+# Project management settings
+PROJECT_CONFIG = {
+    "max_name_length": 25,
     "default_names": {
         "Angular": "Angular Project",
         "Laravel": "Laravel Project", 
         "Custom": "Custom Script"
+    }
+}
+
+# Status configuration
+STATUS_CONFIG = {
+    "colors": {
+        "running": "#28a745",     # Green
+        "stopped": "#dc3545",     # Red  
+        "starting": "#ffc107",    # Yellow
+        "stopping": "#fd7e14",    # Orange
+        "created": "#6c757d"      # Gray
+    },
+    "indicators": {
+        "running": "●",
+        "stopped": "●", 
+        "starting": "●",
+        "stopping": "●",
+        "created": "○"
+    },
+    "text": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "starting": "Starting...",
+        "stopping": "Stopping...",
+        "created": "Ready"
     }
 } 

@@ -1,104 +1,278 @@
 """
-Multi-instance tabbed main window for Project Runner App.
+Sidebar-based main window for Project Runner App.
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import queue
 import threading
 
-from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, TAB_CONFIG
-from gui.widgets import CreateInstanceTab, ProjectInstanceTab
+from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG
+from gui.widgets import CreateInstanceTab, ProjectInstanceTab, ProjectSidebar
 from core.process_manager import ProcessHandler, stream_output_worker, stop_process
 from core.port_manager import find_and_kill_process_on_port
 
 
 class MainWindow:
-    """Multi-instance tabbed main window."""
+    """Sidebar-based main window with project list and status indicators."""
     
     def __init__(self):
         self.root = tk.Tk()
         self.root.title(UI_CONFIG["window_title"])
-        self.root.geometry("900x700")
+        self.root.geometry("1100x700")
         
         # Instance management
-        self.instances = {}  # tab_id -> instance data
+        self.instances = {}  # project_id -> instance data
         self.instance_counters = {"Angular": 0, "Laravel": 0, "Custom": 0}
-        self.next_tab_id = 1
+        self.next_project_id = 1
+        self.current_project_id = None
         
-        # Create tabbed interface
-        self._create_notebook()
-        self._create_initial_tab()
+        # Create main layout
+        self._create_layout()
         self._setup_window_events()
         
-    def _create_notebook(self):
-        """Create the main notebook widget for tabs."""
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+    def _create_layout(self):
+        """Create the main layout with sidebar and content area."""
+        # Create sidebar
+        self.sidebar = ProjectSidebar(
+            self.root,
+            create_callback=self._show_create_dialog,
+            select_callback=self._on_project_select
+        )
         
-        # Bind tab selection event
-        self.notebook.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+        # Create main content area
+        self.content_frame = tk.Frame(self.root, bg="white")
+        self.content_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
-    def _create_initial_tab(self):
-        """Create the initial 'Create New Instance' tab."""
-        create_frame = tk.Frame(self.notebook)
-        self.create_tab = CreateInstanceTab(create_frame, self._create_new_instance)
+        # Show welcome screen initially
+        self._show_welcome_screen()
         
-        self.notebook.add(create_frame, text=TAB_CONFIG["create_tab_title"])
+    def _show_welcome_screen(self):
+        """Show welcome screen when no project is selected."""
+        self._clear_content()
         
-    def _create_new_instance(self, project_type):
-        """Create a new project instance tab."""
+        welcome_frame = tk.Frame(self.content_frame, bg="white")
+        welcome_frame.pack(fill=tk.BOTH, expand=True, padx=50, pady=50)
+        
+        # Welcome message
+        tk.Label(
+            welcome_frame,
+            text="Welcome to Project Runner!",
+            font=("Helvetica", 24, "bold"),
+            fg="#333333",
+            bg="white"
+        ).pack(pady=(50, 20))
+        
+        tk.Label(
+            welcome_frame,
+            text="Create your first project to get started",
+            font=("Helvetica", 14),
+            fg="#666666",
+            bg="white"
+        ).pack(pady=(0, 30))
+        
+        # Large create button
+        create_btn = tk.Button(
+            welcome_frame,
+            text="+ Create New Project",
+            command=self._show_create_dialog,
+            font=("Helvetica", 14, "bold"),
+            bg="#007bff",
+            fg="white",
+            padx=40,
+            pady=15,
+            relief=tk.FLAT
+        )
+        create_btn.pack(pady=20)
+        
+        # Features list
+        features_frame = tk.Frame(welcome_frame, bg="white")
+        features_frame.pack(pady=30)
+        
+        tk.Label(
+            features_frame,
+            text="Features:",
+            font=("Helvetica", 12, "bold"),
+            fg="#333333",
+            bg="white"
+        ).pack(anchor=tk.W)
+        
+        features = [
+            "• Run multiple projects simultaneously",
+            "• Real-time output streaming",
+            "• Automatic port management",
+            "• Support for Angular, Laravel, and Custom projects"
+        ]
+        
+        for feature in features:
+            tk.Label(
+                features_frame,
+                text=feature,
+                font=("Helvetica", 11),
+                fg="#666666",
+                bg="white"
+            ).pack(anchor=tk.W, pady=2)
+            
+    def _show_create_dialog(self):
+        """Show create new project dialog."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Create New Project")
+        dialog.geometry("400x300")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"400x300+{x}+{y}")
+        
+        # Dialog content
+        main_frame = tk.Frame(dialog, bg="white", padx=30, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        tk.Label(
+            main_frame,
+            text="Create New Project",
+            font=("Helvetica", 16, "bold"),
+            fg="#333333",
+            bg="white"
+        ).pack(pady=(0, 20))
+        
+        tk.Label(
+            main_frame,
+            text="Select project type:",
+            font=("Helvetica", 12),
+            fg="#333333",
+            bg="white"
+        ).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Project type selection
+        selected_type = tk.StringVar(value="Laravel")
+        
+        for project_type in ["Angular", "Laravel", "Custom"]:
+            rb = tk.Radiobutton(
+                main_frame,
+                text=f"{project_type} Project",
+                variable=selected_type,
+                value=project_type,
+                font=("Helvetica", 11),
+                bg="white",
+                anchor=tk.W
+            )
+            rb.pack(fill=tk.X, pady=5)
+        
+        # Buttons
+        button_frame = tk.Frame(main_frame, bg="white")
+        button_frame.pack(fill=tk.X, pady=(30, 0))
+        
+        tk.Button(
+            button_frame,
+            text="Cancel",
+            command=dialog.destroy,
+            font=("Helvetica", 10),
+            padx=20,
+            pady=8
+        ).pack(side=tk.RIGHT, padx=(10, 0))
+        
+        tk.Button(
+            button_frame,
+            text="Create Project",
+            command=lambda: self._create_project_from_dialog(dialog, selected_type.get()),
+            font=("Helvetica", 10, "bold"),
+            bg="#007bff",
+            fg="white",
+            padx=20,
+            pady=8
+        ).pack(side=tk.RIGHT)
+        
+    def _create_project_from_dialog(self, dialog, project_type):
+        """Create project from dialog and close it."""
+        dialog.destroy()
+        self._create_new_project(project_type)
+        
+    def _create_new_project(self, project_type):
+        """Create a new project instance."""
         # Increment counter for this project type
         self.instance_counters[project_type] += 1
         instance_number = self.instance_counters[project_type]
         
-        # Create new tab frame
-        tab_frame = tk.Frame(self.notebook)
+        # Generate project ID and name
+        project_id = self.next_project_id
+        self.next_project_id += 1
         
-        # Create project instance
-        instance_tab = ProjectInstanceTab(tab_frame, project_type, instance_number)
+        base_name = PROJECT_CONFIG["default_names"].get(project_type, "Project")
+        if instance_number > 1:
+            project_name = f"{base_name} {instance_number}"
+        else:
+            project_name = base_name
         
         # Create process handler and output queue for this instance
         process_handler = ProcessHandler()
         output_queue = queue.Queue()
         
         # Store instance data
-        tab_id = self.next_tab_id
-        self.next_tab_id += 1
-        
-        self.instances[tab_id] = {
-            'tab_frame': tab_frame,
-            'instance_tab': instance_tab,
+        self.instances[project_id] = {
+            'project_name': project_name,
+            'project_type': project_type,
+            'instance_number': instance_number,
             'process_handler': process_handler,
             'output_queue': output_queue,
-            'project_type': project_type,
-            'instance_number': instance_number
+            'status': 'created',
+            'instance_tab': None  # Will be created when selected
         }
         
-        # Set up callbacks for this instance
-        instance_tab.set_callbacks(
-            lambda: self._run_command(tab_id),
-            lambda: self._stop_command(tab_id)
-        )
+        # Add to sidebar
+        self.sidebar.add_project(project_id, project_name, project_type)
         
-        # Add tab to notebook
-        tab_title = instance_tab.get_tab_title()
-        self.notebook.add(tab_frame, text=tab_title)
+        # Auto-select the new project
+        self._on_project_select(project_id)
         
-        # Switch to the new tab
-        self.notebook.select(tab_frame)
-        
-        # Show success message in output
-        instance_tab.output_widget.write_message("", ("clear_previous",))
-        instance_tab.output_widget.write_message(MESSAGES["instance_created"] + "\n\n", ("info_tag",))
-        instance_tab.output_widget.write_message(MESSAGES["initial_output"], "init_msg_visible_test")
-        
-    def _run_command(self, tab_id):
-        """Run command for specific instance."""
-        if tab_id not in self.instances:
+    def _on_project_select(self, project_id):
+        """Handle project selection from sidebar."""
+        if project_id not in self.instances:
             return
             
-        instance = self.instances[tab_id]
+        self.current_project_id = project_id
+        instance = self.instances[project_id]
+        
+        # Clear content and create project interface
+        self._clear_content()
+        
+        # Create project instance tab if not exists
+        if instance['instance_tab'] is None:
+            instance_tab = ProjectInstanceTab(
+                self.content_frame, 
+                instance['project_type'], 
+                instance['instance_number']
+            )
+            instance['instance_tab'] = instance_tab
+            
+            # Set up callbacks for this instance
+            instance_tab.set_callbacks(
+                lambda: self._run_command(project_id),
+                lambda: self._stop_command(project_id)
+            )
+            
+            # Show initial message
+            instance_tab.output_widget.write_message(MESSAGES["instance_created"] + "\n\n", ("info_tag",))
+            instance_tab.output_widget.write_message(MESSAGES["initial_output"], "init_msg_visible_test")
+        else:
+            # Re-pack existing instance
+            instance['instance_tab'].main_frame.pack(fill=tk.BOTH, expand=True)
+            
+    def _clear_content(self):
+        """Clear the content area."""
+        for widget in self.content_frame.winfo_children():
+            widget.pack_forget()
+            
+    def _run_command(self, project_id):
+        """Run command for specific project."""
+        if project_id not in self.instances:
+            return
+            
+        instance = self.instances[project_id]
         instance_tab = instance['instance_tab']
         process_handler = instance['process_handler']
         output_queue = instance['output_queue']
@@ -115,6 +289,9 @@ class MainWindow:
         cwd = instance_tab.directory_selector.get()
         project_type = instance['project_type']
         
+        # Update status to starting
+        self._update_project_status(project_id, "starting")
+        
         # Clear previous output
         instance_tab.output_widget.write_message("", ("clear_previous",))
         instance_tab.output_widget.write_message(MESSAGES["initial_output"], "init_msg_visible_test")
@@ -124,22 +301,22 @@ class MainWindow:
         port_to_clear = project_config.get("port") if project_config else None
         
         if port_to_clear:
-            self._run_with_port_clearing(tab_id, command, cwd, port_to_clear, project_type)
+            self._run_with_port_clearing(project_id, command, cwd, port_to_clear, project_type)
         else:
-            self._start_command_thread(tab_id, command, cwd)
+            self._start_command_thread(project_id, command, cwd)
             
         # Update UI state
         instance_tab.control_buttons.set_run_enabled(False)
         instance_tab.control_buttons.set_stop_enabled(True)
         process_handler.stop_event.clear()
         
-    def _run_with_port_clearing(self, tab_id, command, cwd, port, project_type):
+    def _run_with_port_clearing(self, project_id, command, cwd, port, project_type):
         """Run command after clearing the specified port."""
-        instance = self.instances[tab_id]
+        instance = self.instances[project_id]
         output_queue = instance['output_queue']
         
         output_queue.put((f"--- Checking port {port} for {project_type} ---\n", ("info_tag",)))
-        self._process_queue(tab_id)  # Process the port check message immediately
+        self._process_queue(project_id)
         
         def port_clear_and_start():
             port_cleared = find_and_kill_process_on_port(port, output_queue)
@@ -149,16 +326,16 @@ class MainWindow:
                 output_queue.put((f"INFO: Port {port} check/clear complete.\n", ("info_tag",)))
             
             if command:
-                self._start_command_thread(tab_id, command, cwd)
+                self._start_command_thread(project_id, command, cwd)
             else:
-                self._command_ended_cleanup(tab_id)
+                self._command_ended_cleanup(project_id)
                 output_queue.put(("No command to run after port clear.", ("info_tag",)))
         
         threading.Thread(target=port_clear_and_start, daemon=True).start()
         
-    def _start_command_thread(self, tab_id, command, cwd):
-        """Start the command execution thread for specific instance."""
-        instance = self.instances[tab_id]
+    def _start_command_thread(self, project_id, command, cwd):
+        """Start the command execution thread for specific project."""
+        instance = self.instances[project_id]
         process_handler = instance['process_handler']
         output_queue = instance['output_queue']
         
@@ -168,28 +345,38 @@ class MainWindow:
             daemon=True
         )
         process_handler.thread.start()
-        self.root.after(PROCESS_CONFIG["queue_check_interval"], lambda: self._process_queue(tab_id))
         
-    def _stop_command(self, tab_id):
-        """Stop the currently running command for specific instance."""
-        if tab_id not in self.instances:
+        # Update status to running
+        self._update_project_status(project_id, "running")
+        
+        self.root.after(PROCESS_CONFIG["queue_check_interval"], lambda: self._process_queue(project_id))
+        
+    def _stop_command(self, project_id):
+        """Stop the currently running command for specific project."""
+        if project_id not in self.instances:
             return
             
-        instance = self.instances[tab_id]
+        instance = self.instances[project_id]
         process_handler = instance['process_handler']
         output_queue = instance['output_queue']
+        
+        # Update status to stopping
+        self._update_project_status(project_id, "stopping")
         
         stop_process(process_handler, output_queue)
         
-    def _process_queue(self, tab_id):
-        """Process messages from the output queue for specific instance."""
-        if tab_id not in self.instances:
+    def _process_queue(self, project_id):
+        """Process messages from the output queue for specific project."""
+        if project_id not in self.instances:
             return
             
-        instance = self.instances[tab_id]
+        instance = self.instances[project_id]
         instance_tab = instance['instance_tab']
         process_handler = instance['process_handler']
         output_queue = instance['output_queue']
+        
+        if not instance_tab:
+            return
         
         try:
             while True:
@@ -200,7 +387,7 @@ class MainWindow:
                 message, tags = message_item if isinstance(message_item, tuple) else (message_item, None)
                 
                 if message == "WORKER_THREAD_DONE":
-                    self._command_ended_cleanup(tab_id)
+                    self._command_ended_cleanup(project_id)
                     break
                 else:
                     instance_tab.output_widget.write_message(message, tags)
@@ -208,48 +395,46 @@ class MainWindow:
         except queue.Empty:
             pass
         except tk.TclError:
-            self._command_ended_cleanup(tab_id)
+            self._command_ended_cleanup(project_id)
             return
-        
-        # Update stop button state based on actual process status
-        if (process_handler.process and 
-            process_handler.process.poll() is None and
-            instance_tab.control_buttons.winfo_exists()):
-            instance_tab.control_buttons.set_stop_enabled(True)
         
         # Continue processing if thread is still alive
         if (process_handler.thread and process_handler.thread.is_alive() and
             self.root.winfo_exists()):
-            self.root.after(PROCESS_CONFIG["queue_check_interval"], lambda: self._process_queue(tab_id))
+            self.root.after(PROCESS_CONFIG["queue_check_interval"], lambda: self._process_queue(project_id))
         elif (not output_queue.empty() and self.root.winfo_exists()):
-            self.root.after(PROCESS_CONFIG["queue_check_interval"], lambda: self._process_queue(tab_id))
+            self.root.after(PROCESS_CONFIG["queue_check_interval"], lambda: self._process_queue(project_id))
         elif (instance_tab.control_buttons.winfo_exists() and 
               instance_tab.control_buttons.run_button['state'] == tk.DISABLED):
-            self._command_ended_cleanup(tab_id)
+            self._command_ended_cleanup(project_id)
             
-    def _command_ended_cleanup(self, tab_id):
-        """Clean up after command execution ends for specific instance."""
-        if tab_id not in self.instances:
+    def _command_ended_cleanup(self, project_id):
+        """Clean up after command execution ends for specific project."""
+        if project_id not in self.instances:
             return
             
-        instance = self.instances[tab_id]
+        instance = self.instances[project_id]
         instance_tab = instance['instance_tab']
         process_handler = instance['process_handler']
         
-        if instance_tab.control_buttons.winfo_exists():
+        if instance_tab and instance_tab.control_buttons.winfo_exists():
             instance_tab.control_buttons.set_run_enabled(True)
             instance_tab.control_buttons.set_stop_enabled(False)
             
         process_handler.reset()
         
-        if instance_tab.output_widget.winfo_exists():
+        # Update status to stopped
+        self._update_project_status(project_id, "stopped")
+        
+        if instance_tab and instance_tab.output_widget.winfo_exists():
             instance_tab.output_widget.write_message(MESSAGES["process_ended"], ("info_tag",))
             
-    def _on_tab_changed(self, event):
-        """Handle tab selection change."""
-        # Could be used for future features like updating window title
-        pass
-        
+    def _update_project_status(self, project_id, status):
+        """Update project status in sidebar and instance data."""
+        if project_id in self.instances:
+            self.instances[project_id]['status'] = status
+            self.sidebar.update_project_status(project_id, status)
+            
     def _setup_window_events(self):
         """Setup window event handlers."""
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
@@ -257,7 +442,7 @@ class MainWindow:
     def _on_closing(self):
         """Handle window closing event."""
         # Stop all running processes
-        for tab_id, instance in self.instances.items():
+        for project_id, instance in self.instances.items():
             process_handler = instance['process_handler']
             if process_handler.is_running():
                 output_queue = instance['output_queue']
