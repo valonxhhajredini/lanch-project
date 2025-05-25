@@ -465,12 +465,13 @@ class ProjectInstanceTab:
 class ProjectListItem:
     """Individual project item in the sidebar."""
     
-    def __init__(self, parent, project_id, project_name, project_type, click_callback=None):
+    def __init__(self, parent, project_id, project_name, project_type, click_callback=None, delete_callback=None):
         self.parent = parent
         self.project_id = project_id
         self.project_name = project_name
         self.project_type = project_type
         self.click_callback = click_callback
+        self.delete_callback = delete_callback
         self.status = "created"
         self.selected = False
         
@@ -537,10 +538,28 @@ class ProjectListItem:
         self.status_text_label.pack(fill=tk.X)
         self.status_text_label.bind("<Button-1>", self._on_click)
         
+        # Delete button
+        self.delete_button = tk.Button(
+            self.frame,
+            text="×",
+            font=("Helvetica", 12, "bold"),
+            fg="#dc3545",
+            bg=self.sidebar_colors["bg"],
+            relief=tk.FLAT,
+            width=2,
+            command=self._on_delete
+        )
+        self.delete_button.pack(side=tk.RIGHT, padx=(5, 10), pady=10)
+        
     def _on_click(self, event):
         """Handle click on project item."""
         if self.click_callback:
             self.click_callback(self.project_id)
+            
+    def _on_delete(self):
+        """Handle delete button click."""
+        if self.delete_callback:
+            self.delete_callback(self.project_id)
             
     def _on_enter(self, event):
         """Handle mouse enter."""
@@ -556,6 +575,7 @@ class ProjectListItem:
         """Update background color of all components."""
         self.frame.config(bg=color)
         self.status_label.config(bg=color)
+        self.delete_button.config(bg=color)
         for child in self.frame.winfo_children():
             if isinstance(child, tk.Frame):
                 child.config(bg=color)
@@ -590,10 +610,11 @@ class ProjectListItem:
 class ProjectSidebar:
     """Sidebar containing project list and controls."""
     
-    def __init__(self, parent, create_callback=None, select_callback=None):
+    def __init__(self, parent, create_callback=None, select_callback=None, delete_callback=None):
         self.parent = parent
         self.create_callback = create_callback
         self.select_callback = select_callback
+        self.delete_callback = delete_callback
         self.project_items = {}
         self.selected_project_id = None
         
@@ -679,7 +700,8 @@ class ProjectSidebar:
             project_id,
             project_name,
             project_type,
-            self._on_project_select
+            self._on_project_select,
+            self._on_project_delete
         )
         self.project_items[project_id] = item
         
@@ -692,6 +714,11 @@ class ProjectSidebar:
         self.select_project(project_id)
         if self.select_callback:
             self.select_callback(project_id)
+            
+    def _on_project_delete(self, project_id):
+        """Handle project deletion."""
+        if self.delete_callback:
+            self.delete_callback(project_id)
             
     def select_project(self, project_id):
         """Select a project in the sidebar."""

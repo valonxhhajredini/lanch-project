@@ -37,7 +37,8 @@ class MainWindow:
         self.sidebar = ProjectSidebar(
             self.root,
             create_callback=self._show_create_dialog,
-            select_callback=self._on_project_select
+            select_callback=self._on_project_select,
+            delete_callback=self._on_project_delete
         )
         
         # Create main content area
@@ -117,16 +118,16 @@ class MainWindow:
         """Show create new project dialog."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Create New Project")
-        dialog.geometry("400x300")
+        dialog.geometry("450x450")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
         
         # Center the dialog
         dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (400 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
-        dialog.geometry(f"400x300+{x}+{y}")
+        x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (450 // 2)
+        dialog.geometry(f"450x450+{x}+{y}")
         
         # Dialog content
         main_frame = tk.Frame(dialog, bg="white", padx=30, pady=20)
@@ -139,6 +140,47 @@ class MainWindow:
             fg="#333333",
             bg="white"
         ).pack(pady=(0, 20))
+        
+        # Project name field
+        tk.Label(
+            main_frame,
+            text="Project Name:",
+            font=("Helvetica", 12),
+            fg="#333333",
+            bg="white"
+        ).pack(anchor=tk.W, pady=(0, 5))
+        
+        project_name_entry = tk.Entry(
+            main_frame,
+            font=("Helvetica", 11),
+            fg="#333333",
+            bg="white",
+            relief=tk.SUNKEN,
+            borderwidth=1
+        )
+        project_name_entry.pack(fill=tk.X, pady=(0, 15))
+        project_name_entry.insert(0, "My Awesome Project")
+        project_name_entry.select_range(0, tk.END)
+        
+        # Project description field
+        tk.Label(
+            main_frame,
+            text="Description (optional):",
+            font=("Helvetica", 12),
+            fg="#333333",
+            bg="white"
+        ).pack(anchor=tk.W, pady=(0, 5))
+        
+        project_desc_entry = tk.Entry(
+            main_frame,
+            font=("Helvetica", 11),
+            fg="#333333",
+            bg="white",
+            relief=tk.SUNKEN,
+            borderwidth=1
+        )
+        project_desc_entry.pack(fill=tk.X, pady=(0, 15))
+        project_desc_entry.insert(0, "Brief description of your project")
         
         tk.Label(
             main_frame,
@@ -166,7 +208,7 @@ class MainWindow:
         
         # Buttons
         button_frame = tk.Frame(main_frame, bg="white")
-        button_frame.pack(fill=tk.X, pady=(30, 0))
+        button_frame.pack(fill=tk.X, pady=(30, 0), side=tk.BOTTOM)
         
         tk.Button(
             button_frame,
@@ -180,7 +222,12 @@ class MainWindow:
         tk.Button(
             button_frame,
             text="Create Project",
-            command=lambda: self._create_project_from_dialog(dialog, selected_type.get()),
+            command=lambda: self._create_project_from_dialog(
+                dialog, 
+                selected_type.get(), 
+                project_name_entry.get().strip(),
+                project_desc_entry.get().strip()
+            ),
             font=("Helvetica", 10, "bold"),
             bg="#28a745",
             fg="white",
@@ -188,12 +235,12 @@ class MainWindow:
             pady=8
         ).pack(side=tk.RIGHT)
         
-    def _create_project_from_dialog(self, dialog, project_type):
+    def _create_project_from_dialog(self, dialog, project_type, project_name, project_desc):
         """Create project from dialog and close it."""
         dialog.destroy()
-        self._create_new_project(project_type)
+        self._create_new_project(project_type, project_name, project_desc)
         
-    def _create_new_project(self, project_type):
+    def _create_new_project(self, project_type, custom_name="", description=""):
         """Create a new project instance."""
         # Increment counter for this project type
         self.instance_counters[project_type] += 1
@@ -203,11 +250,15 @@ class MainWindow:
         project_id = self.next_project_id
         self.next_project_id += 1
         
-        base_name = PROJECT_CONFIG["default_names"].get(project_type, "Project")
-        if instance_number > 1:
-            project_name = f"{base_name} {instance_number}"
+        # Use custom name if provided, otherwise use default naming
+        if custom_name:
+            project_name = custom_name
         else:
-            project_name = base_name
+            base_name = PROJECT_CONFIG["default_names"].get(project_type, "Project")
+            if instance_number > 1:
+                project_name = f"{base_name} {instance_number}"
+            else:
+                project_name = base_name
         
         # Create process handler and output queue for this instance
         process_handler = ProcessHandler()
@@ -218,6 +269,7 @@ class MainWindow:
             'project_name': project_name,
             'project_type': project_type,
             'instance_number': instance_number,
+            'description': description,
             'process_handler': process_handler,
             'output_queue': output_queue,
             'status': 'created',
@@ -435,6 +487,45 @@ class MainWindow:
         if project_id in self.instances:
             self.instances[project_id]['status'] = status
             self.sidebar.update_project_status(project_id, status)
+            
+    def _on_project_delete(self, project_id):
+        """Handle project deletion with confirmation."""
+        if project_id not in self.instances:
+            return
+            
+        instance = self.instances[project_id]
+        project_name = instance['project_name']
+        
+        # Show confirmation dialog
+        from tkinter import messagebox
+        result = messagebox.askyesno(
+            "Delete Project",
+            f"Are you sure you want to delete '{project_name}'?\n\nThis will stop the project if running and remove it from the list.",
+            icon="warning"
+        )
+        
+        if result:
+            # Stop the process if running
+            process_handler = instance['process_handler']
+            if process_handler.is_running():
+                output_queue = instance['output_queue']
+                stop_process(process_handler, output_queue)
+                
+                # Wait briefly for process to stop
+                if process_handler.thread and process_handler.thread.is_alive():
+                    process_handler.thread.join(timeout=1.0)
+            
+            # Remove from sidebar
+            self.sidebar.remove_project(project_id)
+            
+            # Remove from instances
+            del self.instances[project_id]
+            
+            # If this was the current project, show welcome screen
+            if self.current_project_id == project_id:
+                self.current_project_id = None
+                if not self.instances:
+                    self._show_welcome_screen()
             
     def _setup_window_events(self):
         """Setup window event handlers."""
