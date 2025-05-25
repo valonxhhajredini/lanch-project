@@ -29,7 +29,7 @@ UI_CONFIG = {
         "output_width": 70,
         "command_entry_width": 60,
         "sidebar_width": 280,
-        "sidebar_item_height": 70
+        "sidebar_item_height": 90
     }
 }
 
@@ -221,4 +221,4 @@ def toggle_theme():
     """Toggle between light and dark themes."""
     global CURRENT_THEME
     CURRENT_THEME = "dark" if CURRENT_THEME == "light" else "light"
-    return CURRENT_THEME 
+    return THEMES[CURRENT_THEME] 

@@ -54,12 +54,40 @@ class OutputTextWidget(ThemedWidget):
             bg=self.theme["content"]["output_bg"],
             insertbackground=self.theme["content"]["fg"],
             highlightbackground=self.theme["content"]["input_border"],
-            highlightcolor=self.theme["colors"]["primary"]
+            highlightcolor=self.theme["colors"]["primary"],
+            selectbackground=self.theme["colors"]["primary"],
+            selectforeground=self.theme["content"]["bg"]
         )
+        
+        # Update text tags for better theme integration
+        self._configure_tags()
         
     def _configure_tags(self):
         """Configure text tags for different types of output."""
-        for tag_name, tag_config in OUTPUT_TAGS.items():
+        # Theme-aware tag configurations
+        theme_tags = {
+            "error_tag": {
+                "foreground": self.theme["colors"]["danger"],
+                "font": ("Consolas", 10, "bold")
+            },
+            "info_tag": {
+                "foreground": self.theme["colors"]["info"],
+                "font": ("Consolas", 10, "bold")
+            },
+            "stdout_tag": {
+                "foreground": self.theme["content"]["output_fg"]
+            },
+            "stderr_tag": {
+                "foreground": self.theme["colors"]["warning"]
+            },
+            "init_msg_visible_test": {
+                "foreground": self.theme["content"]["output_fg"],
+                "background": self.theme["content"]["output_bg"]
+            }
+        }
+        
+        # Apply theme-aware tags
+        for tag_name, tag_config in theme_tags.items():
             self.widget.tag_config(tag_name, **tag_config)
             
     def _initialize_content(self):
@@ -518,7 +546,7 @@ class ProjectInstanceTab(ThemedWidget):
 class ProjectListItem(ThemedWidget):
     """Individual project item in the sidebar."""
     
-    def __init__(self, parent, project_id, project_name, project_type, click_callback=None, delete_callback=None):
+    def __init__(self, parent, project_id, project_name, project_type, click_callback=None, delete_callback=None, run_callback=None, stop_callback=None):
         super().__init__()
         self.parent = parent
         self.project_id = project_id
@@ -526,6 +554,8 @@ class ProjectListItem(ThemedWidget):
         self.project_type = project_type
         self.click_callback = click_callback
         self.delete_callback = delete_callback
+        self.run_callback = run_callback
+        self.stop_callback = stop_callback
         self.status = "created"
         self.selected = False
         
@@ -547,17 +577,7 @@ class ProjectListItem(ThemedWidget):
         self.frame.bind("<Enter>", self._on_enter)
         self.frame.bind("<Leave>", self._on_leave)
         
-        # Delete button (pack first on the right to ensure it's always visible)
-        self.delete_button = tk.Button(
-            self.frame,
-            text="×",
-            font=("SF Pro Display", 14, "bold"),
-            relief=tk.FLAT,
-            width=2,
-            command=self._on_delete,
-            cursor="hand2"
-        )
-        self.delete_button.pack(side=tk.RIGHT, padx=(5, 15), pady=15)
+
         
         # Status indicator
         self.status_label = tk.Label(
@@ -585,7 +605,7 @@ class ProjectListItem(ThemedWidget):
             font=("SF Pro Display", 12, "bold"),
             anchor=tk.W
         )
-        self.name_label.pack(fill=tk.X)
+        self.name_label.pack(fill=tk.X, anchor=tk.W)
         self.name_label.bind("<Button-1>", self._on_click)
         
         # Project type and status
@@ -595,8 +615,58 @@ class ProjectListItem(ThemedWidget):
             font=("SF Pro Display", 10),
             anchor=tk.W
         )
-        self.status_text_label.pack(fill=tk.X)
+        self.status_text_label.pack(fill=tk.X, anchor=tk.W, pady=(0, 5))
         self.status_text_label.bind("<Button-1>", self._on_click)
+        
+        # Control buttons frame (under the project info)
+        self.controls_frame = tk.Frame(self.info_frame)
+        self.controls_frame.pack(fill=tk.X, anchor=tk.W)
+        
+        # Play button
+        self.play_button = tk.Button(
+            self.controls_frame,
+            text="▶",
+            font=("SF Pro Display", 10),
+            relief=tk.FLAT,
+            width=3,
+            height=1,
+            command=self._on_play,
+            cursor="hand2",
+            borderwidth=0,
+            highlightthickness=0
+        )
+        self.play_button.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Stop button
+        self.stop_button = tk.Button(
+            self.controls_frame,
+            text="⏹",
+            font=("SF Pro Display", 10),
+            relief=tk.FLAT,
+            width=3,
+            height=1,
+            command=self._on_stop,
+            cursor="hand2",
+            borderwidth=0,
+            highlightthickness=0,
+            state=tk.DISABLED
+        )
+        self.stop_button.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Delete button
+        self.delete_button = tk.Button(
+            self.controls_frame,
+            text="×",
+            font=("SF Pro Display", 10, "bold"),
+            relief=tk.FLAT,
+            width=3,
+            height=1,
+            command=self._on_delete,
+            cursor="hand2",
+            borderwidth=0,
+            highlightthickness=0
+        )
+        self.delete_button.pack(side=tk.LEFT, padx=(0, 5))
         
         self.apply_theme()
         
@@ -605,11 +675,37 @@ class ProjectListItem(ThemedWidget):
         # Main frame
         self.frame.configure(bg=self.theme["sidebar"]["bg"])
         
+        # Controls frame
+        self.controls_frame.configure(bg=self.theme["sidebar"]["bg"])
+        
+        # Play button
+        self.play_button.configure(
+            fg=self.theme["colors"]["success"],
+            bg=self.theme["sidebar"]["bg"],
+            activebackground=self.theme["colors"]["success"],
+            activeforeground=self.theme["sidebar"]["bg"],
+            highlightbackground=self.theme["sidebar"]["bg"],
+            highlightcolor=self.theme["colors"]["success"]
+        )
+        
+        # Stop button
+        self.stop_button.configure(
+            fg=self.theme["colors"]["warning"],
+            bg=self.theme["sidebar"]["bg"],
+            activebackground=self.theme["colors"]["warning"],
+            activeforeground=self.theme["sidebar"]["bg"],
+            highlightbackground=self.theme["sidebar"]["bg"],
+            highlightcolor=self.theme["colors"]["warning"]
+        )
+        
         # Delete button
         self.delete_button.configure(
             fg=self.theme["colors"]["danger"],
             bg=self.theme["sidebar"]["bg"],
-            activebackground=self.theme["sidebar"]["hover_bg"]
+            activebackground=self.theme["colors"]["danger"],
+            activeforeground=self.theme["sidebar"]["bg"],
+            highlightbackground=self.theme["sidebar"]["bg"],
+            highlightcolor=self.theme["colors"]["danger"]
         )
         
         # Status indicator
@@ -643,6 +739,16 @@ class ProjectListItem(ThemedWidget):
         if self.delete_callback:
             self.delete_callback(self.project_id)
             
+    def _on_play(self):
+        """Handle play button click."""
+        if self.run_callback:
+            self.run_callback(self.project_id)
+            
+    def _on_stop(self):
+        """Handle stop button click."""
+        if self.stop_callback:
+            self.stop_callback(self.project_id)
+            
     def _on_enter(self, event):
         """Handle mouse enter."""
         if not self.selected:
@@ -657,13 +763,23 @@ class ProjectListItem(ThemedWidget):
         """Update background color of all components."""
         self.frame.config(bg=color)
         self.status_label.config(bg=color)
-        self.delete_button.config(bg=color)
+        
+        # Update all frames and their children recursively
         for child in self.frame.winfo_children():
             if isinstance(child, tk.Frame):
                 child.config(bg=color)
                 for grandchild in child.winfo_children():
                     if isinstance(grandchild, tk.Label):
                         grandchild.config(bg=color)
+                    elif isinstance(grandchild, tk.Frame):
+                        grandchild.config(bg=color)
+                        # Handle buttons in controls frame
+                        for button in grandchild.winfo_children():
+                            if isinstance(button, tk.Button):
+                                button.config(
+                                    bg=color,
+                                    highlightbackground=color
+                                )
                         
     def set_selected(self, selected):
         """Set the selection state."""
@@ -687,18 +803,34 @@ class ProjectListItem(ThemedWidget):
         self.status_text_label.config(
             text=f"{self.project_type} • {STATUS_CONFIG['text'][status]}"
         )
+        
+        # Update button states based on status
+        self._update_button_states()
+        
+    def _update_button_states(self):
+        """Update play/stop button states based on current status."""
+        if self.status in ["running", "starting"]:
+            # Project is running or starting - enable stop, disable play
+            self.play_button.config(state=tk.DISABLED)
+            self.stop_button.config(state=tk.NORMAL)
+        else:
+            # Project is stopped, created, or stopping - enable play, disable stop
+            self.play_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
 
 
 class ProjectSidebar(ThemedWidget):
     """Sidebar containing project list and controls."""
     
-    def __init__(self, parent, create_callback=None, select_callback=None, delete_callback=None, theme_callback=None):
+    def __init__(self, parent, create_callback=None, select_callback=None, delete_callback=None, theme_callback=None, run_callback=None, stop_callback=None):
         super().__init__()
         self.parent = parent
         self.create_callback = create_callback
         self.select_callback = select_callback
         self.delete_callback = delete_callback
         self.theme_callback = theme_callback
+        self.run_callback = run_callback
+        self.stop_callback = stop_callback
         self.project_items = {}
         self.selected_project_id = None
         
@@ -855,7 +987,9 @@ class ProjectSidebar(ThemedWidget):
             project_name,
             project_type,
             self._on_project_select,
-            self._on_project_delete
+            self._on_project_delete,
+            self._on_project_run,
+            self._on_project_stop
         )
         self.project_items[project_id] = item
         
@@ -873,6 +1007,16 @@ class ProjectSidebar(ThemedWidget):
         """Handle project deletion."""
         if self.delete_callback:
             self.delete_callback(project_id)
+            
+    def _on_project_run(self, project_id):
+        """Handle project run."""
+        if self.run_callback:
+            self.run_callback(project_id)
+            
+    def _on_project_stop(self, project_id):
+        """Handle project stop."""
+        if self.stop_callback:
+            self.stop_callback(project_id)
             
     def select_project(self, project_id):
         """Select a project in the sidebar."""

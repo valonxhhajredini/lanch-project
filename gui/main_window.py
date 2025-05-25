@@ -52,7 +52,9 @@ class MainWindow:
             create_callback=self._show_create_dialog,
             select_callback=self._on_project_select,
             delete_callback=self._on_project_delete,
-            theme_callback=self._on_theme_change
+            theme_callback=self._on_theme_change,
+            run_callback=self._run_command,
+            stop_callback=self._stop_command
         )
         
         # Create main content area
@@ -88,6 +90,11 @@ class MainWindow:
         """Handle theme change from sidebar."""
         self._apply_theme()
         self._save_current_theme()
+        
+        # Refresh all project instance tabs
+        for project_id, instance in self.instances.items():
+            if instance['instance_tab']:
+                instance['instance_tab'].refresh_theme()
         
         # Refresh current content
         if self.current_project_id:
