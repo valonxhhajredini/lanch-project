@@ -3,8 +3,8 @@ Custom widgets and UI components for Project Runner App.
 """
 
 import tkinter as tk
-from tkinter import scrolledtext
-from config.settings import UI_CONFIG, OUTPUT_TAGS
+from tkinter import scrolledtext, ttk
+from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, TAB_CONFIG
 
 
 class OutputTextWidget:
@@ -277,4 +277,186 @@ class ControlButtons:
             
     def winfo_exists(self):
         """Check if widgets exist."""
-        return self.run_button.winfo_exists() and self.stop_button.winfo_exists() 
+        return self.run_button.winfo_exists() and self.stop_button.winfo_exists()
+
+
+class CreateInstanceTab:
+    """Widget for creating new project instances."""
+    
+    def __init__(self, parent, create_callback=None):
+        self.parent = parent
+        self.create_callback = create_callback
+        self.colors = UI_CONFIG["colors"]
+        
+        self._create_widgets()
+        
+    def _create_widgets(self):
+        """Create the create instance interface."""
+        # Main container
+        main_frame = tk.Frame(self.parent, bg=self.colors["label_bg"])
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Welcome message
+        welcome_frame = tk.Frame(main_frame, bg=self.colors["label_bg"])
+        welcome_frame.pack(fill=tk.X, pady=(0, 30))
+        
+        welcome_label = tk.Label(
+            welcome_frame,
+            text=MESSAGES["welcome_message"],
+            font=("Helvetica", 12),
+            fg=self.colors["label_fg"],
+            bg=self.colors["label_bg"],
+            justify=tk.LEFT,
+            wraplength=500
+        )
+        welcome_label.pack()
+        
+        # Project type selection
+        selection_frame = tk.Frame(main_frame, bg=self.colors["label_bg"])
+        selection_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        tk.Label(
+            selection_frame,
+            text="Select Project Type:",
+            font=("Helvetica", 14, "bold"),
+            fg=self.colors["label_fg"],
+            bg=self.colors["label_bg"]
+        ).pack(pady=(0, 15))
+        
+        # Project type buttons
+        self.selected_type = tk.StringVar(value="Laravel")
+        
+        button_frame = tk.Frame(selection_frame, bg=self.colors["label_bg"])
+        button_frame.pack()
+        
+        for project_type in ["Angular", "Laravel", "Custom"]:
+            btn = tk.Radiobutton(
+                button_frame,
+                text=f"{project_type} Project",
+                variable=self.selected_type,
+                value=project_type,
+                font=("Helvetica", 11),
+                fg=self.colors["label_fg"],
+                bg=self.colors["button_bg"],
+                selectcolor=self.colors["button_select_color"],
+                indicatoron=0,
+                padx=20,
+                pady=10,
+                relief=tk.RAISED,
+                borderwidth=2
+            )
+            btn.pack(side=tk.LEFT, padx=10)
+        
+        # Create button
+        create_button = tk.Button(
+            main_frame,
+            text="Create Instance",
+            command=self._on_create,
+            font=("Helvetica", 12, "bold"),
+            bg="#4CAF50",
+            fg="white",
+            padx=30,
+            pady=10,
+            relief=tk.RAISED,
+            borderwidth=2
+        )
+        create_button.pack(pady=30)
+        
+    def _on_create(self):
+        """Handle create instance button click."""
+        if self.create_callback:
+            self.create_callback(self.selected_type.get())
+
+
+class ProjectInstanceTab:
+    """Complete project instance tab with all controls."""
+    
+    def __init__(self, parent, project_type, instance_number=1):
+        self.parent = parent
+        self.project_type = project_type
+        self.instance_number = instance_number
+        self.colors = UI_CONFIG["colors"]
+        
+        # Create main container
+        self.main_frame = tk.Frame(parent)
+        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self._create_widgets()
+        
+    def _create_widgets(self):
+        """Create all widgets for the project instance."""
+        # Create frames
+        self._create_frames()
+        
+        # Project type selector (read-only, shows current type)
+        type_label = tk.Label(
+            self.project_type_frame,
+            text=f"Project Type: {self.project_type}",
+            font=("Helvetica", 12, "bold"),
+            fg=self.colors["label_fg"],
+            bg=self.colors["label_bg"]
+        )
+        type_label.pack(side=tk.LEFT, padx=10)
+        
+        # Directory selector
+        self.directory_selector = DirectorySelector(self.dir_frame)
+        
+        # Command entry
+        self.command_entry = CommandEntry(self.command_frame)
+        self.command_entry.update_for_project_type(self.project_type)
+        
+        # Output display
+        tk.Label(
+            self.output_frame,
+            text="Output:",
+            fg=self.colors["label_fg"],
+            bg=self.colors["label_bg"],
+            padx=5
+        ).pack(anchor=tk.NW)
+        
+        self.output_widget = OutputTextWidget(self.output_frame)
+        self.output_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0,5))
+        
+        # Control buttons
+        self.control_buttons = ControlButtons(
+            self.button_frame,
+            run_callback=None,  # Will be set by parent
+            stop_callback=None  # Will be set by parent
+        )
+        
+    def _create_frames(self):
+        """Create the layout frames."""
+        self.project_type_frame = tk.Frame(self.main_frame, pady=2)
+        self.project_type_frame.pack(pady=5, padx=10, fill=tk.X)
+
+        self.dir_frame = tk.Frame(self.main_frame, pady=2)
+        self.dir_frame.pack(pady=5, padx=10, fill=tk.X)
+
+        self.command_frame = tk.Frame(self.main_frame, pady=2)
+        self.command_frame.pack(pady=5, padx=10, fill=tk.X)
+
+        self.output_frame = tk.Frame(self.main_frame, pady=2)
+        self.output_frame.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
+
+        self.button_frame = tk.Frame(self.main_frame)
+        self.button_frame.pack(pady=10, padx=10, fill=tk.X, side=tk.BOTTOM)
+        
+    def get_tab_title(self):
+        """Generate tab title for this instance."""
+        base_name = TAB_CONFIG["default_names"].get(self.project_type, "Project")
+        if self.instance_number > 1:
+            title = f"{base_name} {self.instance_number}"
+        else:
+            title = base_name
+            
+        # Truncate if too long
+        max_length = TAB_CONFIG["max_tab_title_length"]
+        if len(title) > max_length:
+            title = title[:max_length-3] + "..."
+            
+        return title
+        
+    def set_callbacks(self, run_callback, stop_callback):
+        """Set the run and stop callbacks for this instance."""
+        self.control_buttons.run_callback = run_callback
+        self.control_buttons.stop_callback = stop_callback 

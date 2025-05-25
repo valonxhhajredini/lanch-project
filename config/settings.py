@@ -23,7 +23,7 @@ PROJECT_TYPES = {
 
 # UI Configuration
 UI_CONFIG = {
-    "window_title": "Project Runner App V5 - Refactored",
+    "window_title": "Project Runner App V6 - Multi-Instance",
     "colors": {
         "label_fg": "black",
         "label_bg": "#F0F0F0",
@@ -67,5 +67,18 @@ MESSAGES = {
     "process_ended": "\n--- Process Ended/Stopped ---\n",
     "no_command": "No command entered.\n",
     "command_running": "Command already running.\n",
-    "no_command_to_stop": "--- No command to stop. ---\n"
+    "no_command_to_stop": "--- No command to stop. ---\n",
+    "welcome_message": "Welcome to Project Runner!\n\nSelect a project type below and click 'Create Instance' to start managing your projects.\n\nYou can create multiple instances and run them simultaneously in separate tabs.",
+    "instance_created": "Instance created successfully! Configure your project settings above."
+}
+
+# Tab management settings
+TAB_CONFIG = {
+    "create_tab_title": "+ Create New",
+    "max_tab_title_length": 20,
+    "default_names": {
+        "Angular": "Angular Project",
+        "Laravel": "Laravel Project", 
+        "Custom": "Custom Script"
+    }
 } 
