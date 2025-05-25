@@ -7,7 +7,7 @@ from tkinter import ttk, messagebox
 import queue
 import threading
 
-from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG
+from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme
 from gui.widgets import CreateInstanceTab, ProjectInstanceTab, ProjectSidebar
 from core.process_manager import ProcessHandler, stream_output_worker, stop_process
 from core.port_manager import find_and_kill_process_on_port
@@ -21,6 +21,9 @@ class MainWindow:
         self.root.title(UI_CONFIG["window_title"])
         self.root.geometry("1100x700")
         
+        # Theme management
+        self.theme = get_current_theme()
+        
         # Instance management
         self.instances = {}  # project_id -> instance data
         self.instance_counters = {"Angular": 0, "Laravel": 0, "Custom": 0}
@@ -30,6 +33,7 @@ class MainWindow:
         # Create main layout
         self._create_layout()
         self._setup_window_events()
+        self._apply_theme()
         
     def _create_layout(self):
         """Create the main layout with sidebar and content area."""
@@ -38,38 +42,59 @@ class MainWindow:
             self.root,
             create_callback=self._show_create_dialog,
             select_callback=self._on_project_select,
-            delete_callback=self._on_project_delete
+            delete_callback=self._on_project_delete,
+            theme_callback=self._on_theme_change
         )
         
         # Create main content area
-        self.content_frame = tk.Frame(self.root, bg="white")
+        self.content_frame = tk.Frame(self.root)
         self.content_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
         # Show welcome screen initially
         self._show_welcome_screen()
         
+    def _apply_theme(self):
+        """Apply current theme to main window."""
+        self.theme = get_current_theme()
+        
+        # Main window
+        self.root.configure(bg=self.theme["main"]["bg"])
+        
+        # Content frame
+        self.content_frame.configure(bg=self.theme["content"]["bg"])
+        
+    def _on_theme_change(self, new_theme):
+        """Handle theme change from sidebar."""
+        self._apply_theme()
+        
+        # Refresh current content
+        if self.current_project_id:
+            self._on_project_select(self.current_project_id)
+        else:
+            self._show_welcome_screen()
+        
     def _show_welcome_screen(self):
         """Show welcome screen when no project is selected."""
         self._clear_content()
         
-        welcome_frame = tk.Frame(self.content_frame, bg="white")
+        welcome_frame = tk.Frame(self.content_frame, bg=self.theme["content"]["bg"])
         welcome_frame.pack(fill=tk.BOTH, expand=True, padx=50, pady=50)
         
         # Welcome message
         tk.Label(
             welcome_frame,
             text="Welcome to Project Runner!",
-            font=("Helvetica", 24, "bold"),
-            fg="#333333",
-            bg="white"
+            font=("SF Pro Display", 28, "bold"),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
         ).pack(pady=(50, 20))
         
         tk.Label(
             welcome_frame,
             text="Create your first project to get started",
-            font=("Helvetica", 14),
-            fg="#666666",
-            bg="white"
+            font=("SF Pro Display", 16),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
         ).pack(pady=(0, 30))
         
         # Large create button
@@ -77,48 +102,50 @@ class MainWindow:
             welcome_frame,
             text="+ Create New Project",
             command=self._show_create_dialog,
-            font=("Helvetica", 14, "bold"),
-            bg="#28a745",
-            fg="white",
+            font=("SF Pro Display", 16, "bold"),
+            bg=self.theme["buttons"]["success_bg"],
+            fg=self.theme["buttons"]["success_fg"],
             padx=40,
             pady=15,
-            relief=tk.FLAT
+            relief=tk.FLAT,
+            cursor="hand2"
         )
         create_btn.pack(pady=20)
         
         # Features list
-        features_frame = tk.Frame(welcome_frame, bg="white")
+        features_frame = tk.Frame(welcome_frame, bg=self.theme["content"]["bg"])
         features_frame.pack(pady=30)
         
         tk.Label(
             features_frame,
             text="Features:",
-            font=("Helvetica", 12, "bold"),
-            fg="#333333",
-            bg="white"
+            font=("SF Pro Display", 14, "bold"),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
         ).pack(anchor=tk.W)
         
         features = [
             "• Run multiple projects simultaneously",
-            "• Real-time output streaming",
+            "• Real-time output streaming", 
             "• Automatic port management",
-            "• Support for Angular, Laravel, and Custom projects"
+            "• Support for Angular, Laravel, and Custom projects",
+            "• Modern dark and light themes"
         ]
         
         for feature in features:
             tk.Label(
                 features_frame,
                 text=feature,
-                font=("Helvetica", 11),
-                fg="#666666",
-                bg="white"
-            ).pack(anchor=tk.W, pady=2)
+                font=("SF Pro Display", 12),
+                fg=self.theme["content"]["fg"],
+                bg=self.theme["content"]["bg"]
+            ).pack(anchor=tk.W, pady=3)
             
     def _show_create_dialog(self):
         """Show create new project dialog."""
         dialog = tk.Toplevel(self.root)
         dialog.title("Create New Project")
-        dialog.geometry("450x450")
+        dialog.geometry("450x550")  # Increased height even more
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
@@ -126,39 +153,52 @@ class MainWindow:
         # Center the dialog
         dialog.update_idletasks()
         x = (dialog.winfo_screenwidth() // 2) - (450 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (450 // 2)
-        dialog.geometry(f"450x450+{x}+{y}")
+        y = (dialog.winfo_screenheight() // 2) - (550 // 2)
+        dialog.geometry(f"450x550+{x}+{y}")
         
-        # Dialog content
-        main_frame = tk.Frame(dialog, bg="white", padx=30, pady=20)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # Apply theme to dialog
+        dialog.configure(bg=self.theme["content"]["bg"])
+        
+        # Create a container frame that fills the dialog
+        container = tk.Frame(dialog, bg=self.theme["content"]["bg"])
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        # Main content frame (scrollable content area)
+        main_frame = tk.Frame(container, bg=self.theme["content"]["bg"])
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(20, 0))
+        
+        # Button frame at the bottom (fixed position)
+        bottom_frame = tk.Frame(container, bg=self.theme["content"]["bg"])
+        bottom_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=30, pady=(10, 20))
         
         tk.Label(
             main_frame,
             text="Create New Project",
-            font=("Helvetica", 16, "bold"),
-            fg="#333333",
-            bg="white"
+            font=("SF Pro Display", 18, "bold"),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
         ).pack(pady=(0, 20))
         
         # Project name field
         tk.Label(
             main_frame,
             text="Project Name:",
-            font=("Helvetica", 12),
-            fg="#333333",
-            bg="white"
-        ).pack(anchor=tk.W, pady=(0, 5))
+            font=("SF Pro Display", 13, "bold"),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
+        ).pack(anchor=tk.W, pady=(0, 8))
         
         project_name_entry = tk.Entry(
             main_frame,
-            font=("Helvetica", 11),
-            fg="#333333",
-            bg="white",
-            relief=tk.SUNKEN,
-            borderwidth=1
+            font=("SF Pro Display", 12),
+            fg=self.theme["content"]["input_fg"],
+            bg=self.theme["content"]["input_bg"],
+            relief=tk.FLAT,
+            borderwidth=2,
+            highlightthickness=1,
+            highlightcolor=self.theme["colors"]["primary"]
         )
-        project_name_entry.pack(fill=tk.X, pady=(0, 15))
+        project_name_entry.pack(fill=tk.X, pady=(0, 20))
         project_name_entry.insert(0, "My Awesome Project")
         project_name_entry.select_range(0, tk.END)
         
@@ -166,61 +206,74 @@ class MainWindow:
         tk.Label(
             main_frame,
             text="Description (optional):",
-            font=("Helvetica", 12),
-            fg="#333333",
-            bg="white"
-        ).pack(anchor=tk.W, pady=(0, 5))
+            font=("SF Pro Display", 13, "bold"),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
+        ).pack(anchor=tk.W, pady=(0, 8))
         
         project_desc_entry = tk.Entry(
             main_frame,
-            font=("Helvetica", 11),
-            fg="#333333",
-            bg="white",
-            relief=tk.SUNKEN,
-            borderwidth=1
+            font=("SF Pro Display", 12),
+            fg=self.theme["content"]["input_fg"],
+            bg=self.theme["content"]["input_bg"],
+            relief=tk.FLAT,
+            borderwidth=2,
+            highlightthickness=1,
+            highlightcolor=self.theme["colors"]["primary"]
         )
-        project_desc_entry.pack(fill=tk.X, pady=(0, 15))
+        project_desc_entry.pack(fill=tk.X, pady=(0, 20))
         project_desc_entry.insert(0, "Brief description of your project")
         
         tk.Label(
             main_frame,
             text="Select project type:",
-            font=("Helvetica", 12),
-            fg="#333333",
-            bg="white"
-        ).pack(anchor=tk.W, pady=(0, 10))
+            font=("SF Pro Display", 13, "bold"),
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
+        ).pack(anchor=tk.W, pady=(0, 15))
         
         # Project type selection
         selected_type = tk.StringVar(value="Laravel")
         
+        radio_frame = tk.Frame(main_frame, bg=self.theme["content"]["bg"])
+        radio_frame.pack(fill=tk.X, pady=(0, 25))
+        
         for project_type in ["Angular", "Laravel", "Custom"]:
             rb = tk.Radiobutton(
-                main_frame,
+                radio_frame,
                 text=f"{project_type} Project",
                 variable=selected_type,
                 value=project_type,
-                font=("Helvetica", 11),
-                fg="#333333",
-                bg="white",
-                anchor=tk.W
+                font=("SF Pro Display", 12),
+                fg=self.theme["content"]["fg"],
+                bg=self.theme["content"]["bg"],
+                selectcolor=self.theme["colors"]["primary"],
+                activebackground=self.theme["content"]["bg"],
+                activeforeground=self.theme["content"]["fg"],
+                anchor=tk.W,
+                cursor="hand2"
             )
-            rb.pack(fill=tk.X, pady=5)
+            rb.pack(fill=tk.X, pady=8, padx=10)
         
-        # Buttons
-        button_frame = tk.Frame(main_frame, bg="white")
-        button_frame.pack(fill=tk.X, pady=(30, 0), side=tk.BOTTOM)
-        
-        tk.Button(
-            button_frame,
+        # Create buttons in the fixed bottom frame
+        # Cancel button
+        cancel_btn = tk.Button(
+            bottom_frame,
             text="Cancel",
             command=dialog.destroy,
-            font=("Helvetica", 10),
-            padx=20,
-            pady=8
-        ).pack(side=tk.RIGHT, padx=(10, 0))
+            font=("SF Pro Display", 11),
+            bg=self.theme["buttons"]["secondary_bg"],
+            fg=self.theme["buttons"]["secondary_fg"],
+            relief=tk.FLAT,
+            padx=25,
+            pady=10,
+            cursor="hand2"
+        )
+        cancel_btn.pack(side=tk.RIGHT, padx=(15, 0))
         
-        tk.Button(
-            button_frame,
+        # Create button
+        create_btn = tk.Button(
+            bottom_frame,
             text="Create Project",
             command=lambda: self._create_project_from_dialog(
                 dialog, 
@@ -228,12 +281,22 @@ class MainWindow:
                 project_name_entry.get().strip(),
                 project_desc_entry.get().strip()
             ),
-            font=("Helvetica", 10, "bold"),
-            bg="#28a745",
-            fg="white",
-            padx=20,
-            pady=8
-        ).pack(side=tk.RIGHT)
+            font=("SF Pro Display", 11, "bold"),
+            bg=self.theme["buttons"]["success_bg"],
+            fg=self.theme["buttons"]["success_fg"],
+            relief=tk.FLAT,
+            padx=25,
+            pady=10,
+            cursor="hand2"
+        )
+        create_btn.pack(side=tk.RIGHT)
+        
+        # Bind Enter key to create button
+        dialog.bind('<Return>', lambda e: create_btn.invoke())
+        dialog.bind('<Escape>', lambda e: dialog.destroy())
+        
+        # Focus on project name entry
+        project_name_entry.focus_set()
         
     def _create_project_from_dialog(self, dialog, project_type, project_name, project_desc):
         """Create project from dialog and close it."""

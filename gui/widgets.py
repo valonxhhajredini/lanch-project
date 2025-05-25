@@ -4,14 +4,31 @@ Custom widgets and UI components for Project Runner App.
 
 import tkinter as tk
 from tkinter import scrolledtext, ttk
-from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG
+from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme
 
 
-class OutputTextWidget:
+class ThemedWidget:
+    """Base class for theme-aware widgets."""
+    
+    def __init__(self):
+        self.theme = get_current_theme()
+        
+    def refresh_theme(self):
+        """Refresh the theme and update widget appearance."""
+        self.theme = get_current_theme()
+        self.apply_theme()
+        
+    def apply_theme(self):
+        """Apply theme to widget. Override in subclasses."""
+        pass
+
+
+class OutputTextWidget(ThemedWidget):
     """Custom output text widget with proper styling and tag configuration."""
     
     def __init__(self, parent):
-        self.colors = UI_CONFIG["colors"]
+        super().__init__()
+        self.parent = parent
         self.dimensions = UI_CONFIG["dimensions"]
         
         # Create the scrolled text widget
@@ -20,14 +37,25 @@ class OutputTextWidget:
             height=self.dimensions["output_height"], 
             width=self.dimensions["output_width"], 
             wrap=tk.WORD, 
-            relief=tk.SUNKEN,
-            fg=self.colors["output_text_fg"], 
-            bg=self.colors["output_text_bg"], 
-            insertbackground=self.colors["output_cursor_bg"]
+            relief=tk.FLAT,
+            borderwidth=1,
+            font=("Consolas", 10),
+            selectbackground=self.theme["colors"]["primary"]
         )
         
+        self.apply_theme()
         self._configure_tags()
         self._initialize_content()
+        
+    def apply_theme(self):
+        """Apply current theme to the output widget."""
+        self.widget.configure(
+            fg=self.theme["content"]["output_fg"],
+            bg=self.theme["content"]["output_bg"],
+            insertbackground=self.theme["content"]["fg"],
+            highlightbackground=self.theme["content"]["input_border"],
+            highlightcolor=self.theme["colors"]["primary"]
+        )
         
     def _configure_tags(self):
         """Configure text tags for different types of output."""
@@ -72,7 +100,6 @@ class ProjectTypeSelector:
     def __init__(self, parent, on_change_callback=None):
         self.parent = parent
         self.on_change_callback = on_change_callback
-        self.colors = UI_CONFIG["colors"]
         
         # Create the variable and trace changes
         self.project_type = tk.StringVar(value="Custom")
@@ -86,8 +113,8 @@ class ProjectTypeSelector:
         tk.Label(
             self.parent, 
             text="Project Type:", 
-            fg=self.colors["label_fg"], 
-            bg=self.colors["label_bg"], 
+            fg="#333333", 
+            bg="#ffffff", 
             padx=5
         ).pack(side=tk.LEFT)
         
@@ -100,9 +127,9 @@ class ProjectTypeSelector:
                 value=project_type, 
                 indicatoron=0, 
                 padx=10, 
-                fg=self.colors["label_fg"], 
-                selectcolor=self.colors["button_select_color"], 
-                bg=self.colors["button_bg"]
+                fg="#333333", 
+                selectcolor="#007bff", 
+                bg="#f8f9fa"
             ).pack(side=tk.RIGHT, padx=2)
             
     def _on_change(self, *args):
@@ -120,7 +147,6 @@ class DirectorySelector:
     
     def __init__(self, parent, initial_dir=None):
         self.parent = parent
-        self.colors = UI_CONFIG["colors"]
         
         # Initialize directory variable
         import os
@@ -133,8 +159,8 @@ class DirectorySelector:
         tk.Label(
             self.parent, 
             text="Working Directory:", 
-            fg=self.colors["label_fg"], 
-            bg=self.colors["label_bg"], 
+            fg="#333333", 
+            bg="#ffffff", 
             padx=5
         ).pack(side=tk.LEFT)
         
@@ -142,8 +168,8 @@ class DirectorySelector:
             self.parent, 
             textvariable=self.selected_directory, 
             relief=tk.SUNKEN, 
-            fg=self.colors["entry_fg"], 
-            bg=self.colors["entry_bg"], 
+            fg="#495057", 
+            bg="#ffffff", 
             padx=10, 
             anchor=tk.W
         )
@@ -173,7 +199,6 @@ class CommandEntry:
     
     def __init__(self, parent):
         self.parent = parent
-        self.colors = UI_CONFIG["colors"]
         self.dimensions = UI_CONFIG["dimensions"]
         
         self._create_widgets()
@@ -183,16 +208,16 @@ class CommandEntry:
         tk.Label(
             self.parent, 
             text="Command:", 
-            fg=self.colors["label_fg"], 
-            bg=self.colors["label_bg"], 
+            fg="#333333", 
+            bg="#ffffff", 
             padx=5
         ).pack(side=tk.LEFT)
         
         self.entry = tk.Entry(
             self.parent, 
             width=self.dimensions["command_entry_width"], 
-            fg=self.colors["entry_fg"], 
-            bg=self.colors["entry_bg"], 
+            fg="#495057", 
+            bg="#ffffff", 
             relief=tk.SUNKEN
         )
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
@@ -203,19 +228,19 @@ class CommandEntry:
         
         project_config = PROJECT_TYPES.get(project_type, PROJECT_TYPES["Custom"])
         
-        self.entry.configure(state='normal', fg=self.colors["entry_fg"], bg=self.colors["entry_bg"])
+        self.entry.configure(state='normal', fg="#495057", bg="#ffffff")
         self.entry.delete(0, tk.END)
         
         if project_config["readonly"]:
             self.entry.insert(0, project_config["command"])
             self.entry.configure(
                 state='readonly', 
-                fg=self.colors["entry_fg"], 
-                readonlybackground=self.colors["readonly_bg"], 
-                bg=self.colors["readonly_bg"]
+                fg="#495057", 
+                readonlybackground="#e9ecef", 
+                bg="#e9ecef"
             )
         else:
-            self.entry.configure(state='normal', fg=self.colors["entry_fg"], bg=self.colors["entry_bg"])
+            self.entry.configure(state='normal', fg="#495057", bg="#ffffff")
             
     def get(self):
         """Get the current command."""
@@ -286,47 +311,46 @@ class CreateInstanceTab:
     def __init__(self, parent, create_callback=None):
         self.parent = parent
         self.create_callback = create_callback
-        self.colors = UI_CONFIG["colors"]
         
         self._create_widgets()
         
     def _create_widgets(self):
         """Create the create instance interface."""
         # Main container
-        main_frame = tk.Frame(self.parent, bg=self.colors["label_bg"])
+        main_frame = tk.Frame(self.parent, bg="#ffffff")
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Welcome message
-        welcome_frame = tk.Frame(main_frame, bg=self.colors["label_bg"])
+        welcome_frame = tk.Frame(main_frame, bg="#ffffff")
         welcome_frame.pack(fill=tk.X, pady=(0, 30))
         
         welcome_label = tk.Label(
             welcome_frame,
             text=MESSAGES["welcome_message"],
             font=("Helvetica", 12),
-            fg=self.colors["label_fg"],
-            bg=self.colors["label_bg"],
+            fg="#333333",
+            bg="#ffffff",
             justify=tk.LEFT,
             wraplength=500
         )
         welcome_label.pack()
         
         # Project type selection
-        selection_frame = tk.Frame(main_frame, bg=self.colors["label_bg"])
+        selection_frame = tk.Frame(main_frame, bg="#ffffff")
         selection_frame.pack(fill=tk.X, pady=(0, 20))
         
         tk.Label(
             selection_frame,
             text="Select Project Type:",
             font=("Helvetica", 14, "bold"),
-            fg=self.colors["label_fg"],
-            bg=self.colors["label_bg"]
+            fg="#333333",
+            bg="#ffffff"
         ).pack(pady=(0, 15))
         
         # Project type buttons
         self.selected_type = tk.StringVar(value="Laravel")
         
-        button_frame = tk.Frame(selection_frame, bg=self.colors["label_bg"])
+        button_frame = tk.Frame(selection_frame, bg="#ffffff")
         button_frame.pack()
         
         for project_type in ["Angular", "Laravel", "Custom"]:
@@ -336,9 +360,9 @@ class CreateInstanceTab:
                 variable=self.selected_type,
                 value=project_type,
                 font=("Helvetica", 11),
-                fg=self.colors["label_fg"],
-                bg=self.colors["button_bg"],
-                selectcolor=self.colors["button_select_color"],
+                fg="#333333",
+                bg="#f8f9fa",
+                selectcolor="#007bff",
                 indicatoron=0,
                 padx=20,
                 pady=10,
@@ -368,20 +392,21 @@ class CreateInstanceTab:
             self.create_callback(self.selected_type.get())
 
 
-class ProjectInstanceTab:
+class ProjectInstanceTab(ThemedWidget):
     """Complete project instance tab with all controls."""
     
     def __init__(self, parent, project_type, instance_number=1):
+        super().__init__()
         self.parent = parent
         self.project_type = project_type
         self.instance_number = instance_number
-        self.colors = UI_CONFIG["colors"]
         
         # Create main container
         self.main_frame = tk.Frame(parent)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
         self._create_widgets()
+        self.apply_theme()
         
     def _create_widgets(self):
         """Create all widgets for the project instance."""
@@ -389,14 +414,12 @@ class ProjectInstanceTab:
         self._create_frames()
         
         # Project type selector (read-only, shows current type)
-        type_label = tk.Label(
+        self.type_label = tk.Label(
             self.project_type_frame,
             text=f"Project Type: {self.project_type}",
-            font=("Helvetica", 12, "bold"),
-            fg=self.colors["label_fg"],
-            bg=self.colors["label_bg"]
+            font=("SF Pro Display", 12, "bold")
         )
-        type_label.pack(side=tk.LEFT, padx=10)
+        self.type_label.pack(side=tk.LEFT, padx=10)
         
         # Directory selector
         self.directory_selector = DirectorySelector(self.dir_frame)
@@ -406,13 +429,13 @@ class ProjectInstanceTab:
         self.command_entry.update_for_project_type(self.project_type)
         
         # Output display
-        tk.Label(
+        self.output_label = tk.Label(
             self.output_frame,
             text="Output:",
-            fg=self.colors["label_fg"],
-            bg=self.colors["label_bg"],
+            font=("SF Pro Display", 12, "bold"),
             padx=5
-        ).pack(anchor=tk.NW)
+        )
+        self.output_label.pack(anchor=tk.NW)
         
         self.output_widget = OutputTextWidget(self.output_frame)
         self.output_widget.pack(fill=tk.BOTH, expand=True, padx=5, pady=(0,5))
@@ -426,16 +449,16 @@ class ProjectInstanceTab:
         
     def _create_frames(self):
         """Create the layout frames."""
-        self.project_type_frame = tk.Frame(self.main_frame, pady=2)
+        self.project_type_frame = tk.Frame(self.main_frame)
         self.project_type_frame.pack(pady=5, padx=10, fill=tk.X)
 
-        self.dir_frame = tk.Frame(self.main_frame, pady=2)
+        self.dir_frame = tk.Frame(self.main_frame)
         self.dir_frame.pack(pady=5, padx=10, fill=tk.X)
 
-        self.command_frame = tk.Frame(self.main_frame, pady=2)
+        self.command_frame = tk.Frame(self.main_frame)
         self.command_frame.pack(pady=5, padx=10, fill=tk.X)
 
-        self.output_frame = tk.Frame(self.main_frame, pady=2)
+        self.output_frame = tk.Frame(self.main_frame)
         self.output_frame.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
 
         self.button_frame = tk.Frame(self.main_frame)
@@ -460,12 +483,43 @@ class ProjectInstanceTab:
         """Set the run and stop callbacks for this instance."""
         self.control_buttons.run_callback = run_callback
         self.control_buttons.stop_callback = stop_callback
+        
+    def apply_theme(self):
+        """Apply current theme to the project instance tab."""
+        # Main frame
+        self.main_frame.configure(bg=self.theme["content"]["bg"])
+        
+        # All sub-frames
+        frames = ['project_type_frame', 'dir_frame', 'command_frame', 'output_frame', 'button_frame']
+        for frame_name in frames:
+            if hasattr(self, frame_name):
+                frame = getattr(self, frame_name)
+                if frame.winfo_exists():
+                    frame.configure(bg=self.theme["content"]["bg"])
+        
+        # Labels
+        if hasattr(self, 'type_label') and self.type_label.winfo_exists():
+            self.type_label.configure(
+                fg=self.theme["content"]["fg"],
+                bg=self.theme["content"]["bg"]
+            )
+            
+        if hasattr(self, 'output_label') and self.output_label.winfo_exists():
+            self.output_label.configure(
+                fg=self.theme["content"]["fg"],
+                bg=self.theme["content"]["bg"]
+            )
+            
+        # Refresh themed widgets
+        if hasattr(self, 'output_widget'):
+            self.output_widget.refresh_theme()
 
 
-class ProjectListItem:
+class ProjectListItem(ThemedWidget):
     """Individual project item in the sidebar."""
     
     def __init__(self, parent, project_id, project_name, project_type, click_callback=None, delete_callback=None):
+        super().__init__()
         self.parent = parent
         self.project_id = project_id
         self.project_name = project_name
@@ -475,21 +529,17 @@ class ProjectListItem:
         self.status = "created"
         self.selected = False
         
-        self.colors = UI_CONFIG["colors"]
-        self.sidebar_colors = UI_CONFIG["sidebar"]
-        
         self._create_widget()
         
     def _create_widget(self):
         """Create the project list item widget."""
         self.frame = tk.Frame(
             self.parent,
-            bg=self.sidebar_colors["bg"],
             relief=tk.FLAT,
-            borderwidth=1,
+            borderwidth=0,
             height=UI_CONFIG["dimensions"]["sidebar_item_height"]
         )
-        self.frame.pack(fill=tk.X, padx=5, pady=2)
+        self.frame.pack(fill=tk.X, padx=10, pady=3)
         self.frame.pack_propagate(False)  # Maintain fixed height
         
         # Bind click events
@@ -501,43 +551,38 @@ class ProjectListItem:
         self.delete_button = tk.Button(
             self.frame,
             text="×",
-            font=("Helvetica", 12, "bold"),
-            fg="#dc3545",
-            bg=self.sidebar_colors["bg"],
+            font=("SF Pro Display", 14, "bold"),
             relief=tk.FLAT,
             width=2,
-            command=self._on_delete
+            command=self._on_delete,
+            cursor="hand2"
         )
-        self.delete_button.pack(side=tk.RIGHT, padx=(5, 10), pady=10)
+        self.delete_button.pack(side=tk.RIGHT, padx=(5, 15), pady=15)
         
         # Status indicator
         self.status_label = tk.Label(
             self.frame,
             text=STATUS_CONFIG["indicators"]["created"],
-            font=("Helvetica", 16),
-            fg=STATUS_CONFIG["colors"]["created"],
-            bg=self.sidebar_colors["bg"],
+            font=("SF Pro Display", 18),
             width=2
         )
-        self.status_label.pack(side=tk.LEFT, padx=(10, 5), pady=10)
+        self.status_label.pack(side=tk.LEFT, padx=(15, 10), pady=15)
         self.status_label.bind("<Button-1>", self._on_click)
         
         # Project info frame (fills remaining space between status and delete button)
-        info_frame = tk.Frame(self.frame, bg=self.sidebar_colors["bg"])
-        info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 5), pady=5)
-        info_frame.bind("<Button-1>", self._on_click)
+        self.info_frame = tk.Frame(self.frame)
+        self.info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 5), pady=10)
+        self.info_frame.bind("<Button-1>", self._on_click)
         
         # Project name (truncate if too long)
         display_name = self.project_name
-        if len(display_name) > 20:  # Truncate long names
-            display_name = display_name[:17] + "..."
+        if len(display_name) > 18:  # Truncate long names
+            display_name = display_name[:15] + "..."
             
         self.name_label = tk.Label(
-            info_frame,
+            self.info_frame,
             text=display_name,
-            font=("Helvetica", 11, "bold"),
-            fg=self.colors["label_fg"],
-            bg=self.sidebar_colors["bg"],
+            font=("SF Pro Display", 12, "bold"),
             anchor=tk.W
         )
         self.name_label.pack(fill=tk.X)
@@ -545,15 +590,48 @@ class ProjectListItem:
         
         # Project type and status
         self.status_text_label = tk.Label(
-            info_frame,
+            self.info_frame,
             text=f"{self.project_type} • {STATUS_CONFIG['text']['created']}",
-            font=("Helvetica", 9),
-            fg="#666666",
-            bg=self.sidebar_colors["bg"],
+            font=("SF Pro Display", 10),
             anchor=tk.W
         )
         self.status_text_label.pack(fill=tk.X)
         self.status_text_label.bind("<Button-1>", self._on_click)
+        
+        self.apply_theme()
+        
+    def apply_theme(self):
+        """Apply current theme to the project item."""
+        # Main frame
+        self.frame.configure(bg=self.theme["sidebar"]["bg"])
+        
+        # Delete button
+        self.delete_button.configure(
+            fg=self.theme["colors"]["danger"],
+            bg=self.theme["sidebar"]["bg"],
+            activebackground=self.theme["sidebar"]["hover_bg"]
+        )
+        
+        # Status indicator
+        self.status_label.configure(
+            fg=STATUS_CONFIG["colors"][self.status],
+            bg=self.theme["sidebar"]["bg"]
+        )
+        
+        # Info frame
+        self.info_frame.configure(bg=self.theme["sidebar"]["bg"])
+        
+        # Name label
+        self.name_label.configure(
+            fg=self.theme["sidebar"]["fg"],
+            bg=self.theme["sidebar"]["bg"]
+        )
+        
+        # Status text label
+        self.status_text_label.configure(
+            fg=self.theme["sidebar"]["fg"],
+            bg=self.theme["sidebar"]["bg"]
+        )
         
     def _on_click(self, event):
         """Handle click on project item."""
@@ -568,12 +646,12 @@ class ProjectListItem:
     def _on_enter(self, event):
         """Handle mouse enter."""
         if not self.selected:
-            self._update_background(self.sidebar_colors["hover_bg"])
+            self._update_background(self.theme["sidebar"]["hover_bg"])
             
     def _on_leave(self, event):
         """Handle mouse leave."""
         if not self.selected:
-            self._update_background(self.sidebar_colors["bg"])
+            self._update_background(self.theme["sidebar"]["bg"])
             
     def _update_background(self, color):
         """Update background color of all components."""
@@ -591,9 +669,9 @@ class ProjectListItem:
         """Set the selection state."""
         self.selected = selected
         if selected:
-            self._update_background(self.sidebar_colors["selected_bg"])
+            self._update_background(self.theme["sidebar"]["selected_bg"])
         else:
-            self._update_background(self.sidebar_colors["bg"])
+            self._update_background(self.theme["sidebar"]["bg"])
             
     def update_status(self, status):
         """Update the project status."""
@@ -611,19 +689,18 @@ class ProjectListItem:
         )
 
 
-class ProjectSidebar:
+class ProjectSidebar(ThemedWidget):
     """Sidebar containing project list and controls."""
     
-    def __init__(self, parent, create_callback=None, select_callback=None, delete_callback=None):
+    def __init__(self, parent, create_callback=None, select_callback=None, delete_callback=None, theme_callback=None):
+        super().__init__()
         self.parent = parent
         self.create_callback = create_callback
         self.select_callback = select_callback
         self.delete_callback = delete_callback
+        self.theme_callback = theme_callback
         self.project_items = {}
         self.selected_project_id = None
-        
-        self.colors = UI_CONFIG["colors"]
-        self.sidebar_colors = UI_CONFIG["sidebar"]
         
         self._create_widgets()
         
@@ -632,66 +709,139 @@ class ProjectSidebar:
         # Main sidebar frame
         self.sidebar_frame = tk.Frame(
             self.parent,
-            bg=self.sidebar_colors["bg"],
             width=UI_CONFIG["dimensions"]["sidebar_width"],
-            relief=tk.RAISED,
-            borderwidth=1
+            relief=tk.FLAT,
+            borderwidth=0
         )
         self.sidebar_frame.pack(side=tk.LEFT, fill=tk.Y)
         self.sidebar_frame.pack_propagate(False)  # Maintain fixed width
         
-        # Header
-        header_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_colors["bg"])
-        header_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # Header with theme toggle
+        header_frame = tk.Frame(self.sidebar_frame)
+        header_frame.pack(fill=tk.X, padx=15, pady=(15, 10))
         
-        tk.Label(
+        # Projects title
+        self.title_label = tk.Label(
             header_frame,
             text="Projects",
-            font=("Helvetica", 14, "bold"),
-            fg=self.colors["label_fg"],
-            bg=self.sidebar_colors["bg"]
-        ).pack(anchor=tk.W)
+            font=("SF Pro Display", 16, "bold"),
+            anchor=tk.W
+        )
+        self.title_label.pack(side=tk.LEFT)
+        
+        # Theme toggle button
+        self.theme_button = tk.Button(
+            header_frame,
+            text="🌙",
+            font=("SF Pro Display", 14),
+            command=self._on_theme_toggle,
+            relief=tk.FLAT,
+            width=3,
+            height=1,
+            cursor="hand2"
+        )
+        self.theme_button.pack(side=tk.RIGHT)
         
         # Create new project button
         self.create_button = tk.Button(
             self.sidebar_frame,
             text="+ Create New Project",
             command=self._on_create_new,
-            font=("Helvetica", 10, "bold"),
-            bg="#28a745",
-            fg="white",
+            font=("SF Pro Display", 11, "bold"),
             relief=tk.FLAT,
             padx=20,
-            pady=8
+            pady=12,
+            cursor="hand2"
         )
-        self.create_button.pack(fill=tk.X, padx=10, pady=(5, 15))
+        self.create_button.pack(fill=tk.X, padx=15, pady=(5, 20))
         
         # Scrollable project list
-        self.list_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_colors["bg"])
+        self.list_frame = tk.Frame(self.sidebar_frame)
         self.list_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
         
         # Status legend
-        legend_frame = tk.Frame(self.sidebar_frame, bg=self.sidebar_colors["bg"])
-        legend_frame.pack(fill=tk.X, padx=10, pady=10, side=tk.BOTTOM)
+        self.legend_frame = tk.Frame(self.sidebar_frame)
+        self.legend_frame.pack(fill=tk.X, padx=15, pady=15, side=tk.BOTTOM)
         
-        tk.Label(
-            legend_frame,
+        self.legend_title = tk.Label(
+            self.legend_frame,
             text="Status:",
-            font=("Helvetica", 8, "bold"),
-            fg="#666666",
-            bg=self.sidebar_colors["bg"]
-        ).pack(anchor=tk.W)
+            font=("SF Pro Display", 10, "bold")
+        )
+        self.legend_title.pack(anchor=tk.W)
         
+        self.legend_labels = []
         for status, color in [("running", "🟢 Running"), ("stopped", "🔴 Stopped"), 
                              ("starting", "🟡 Starting"), ("created", "⚪ Ready")]:
-            tk.Label(
-                legend_frame,
+            label = tk.Label(
+                self.legend_frame,
                 text=color,
-                font=("Helvetica", 8),
-                fg="#666666",
-                bg=self.sidebar_colors["bg"]
-            ).pack(anchor=tk.W)
+                font=("SF Pro Display", 9)
+            )
+            label.pack(anchor=tk.W)
+            self.legend_labels.append(label)
             
+        self.apply_theme()
+            
+    def apply_theme(self):
+        """Apply current theme to sidebar."""
+        # Main sidebar frame
+        self.sidebar_frame.configure(bg=self.theme["sidebar"]["bg"])
+        
+        # Header elements
+        self.title_label.configure(
+            fg=self.theme["sidebar"]["header_fg"],
+            bg=self.theme["sidebar"]["header_bg"]
+        )
+        
+        # Theme toggle button
+        from config.settings import THEMES
+        theme_icon = "☀️" if get_current_theme() == THEMES["dark"] else "🌙"
+        self.theme_button.configure(
+            bg=self.theme["buttons"]["light_bg"],
+            fg=self.theme["buttons"]["light_fg"],
+            activebackground=self.theme["sidebar"]["hover_bg"],
+            text=theme_icon
+        )
+        
+        # Create button
+        self.create_button.configure(
+            bg=self.theme["buttons"]["success_bg"],
+            fg=self.theme["buttons"]["success_fg"],
+            activebackground=self.theme["colors"]["success"]
+        )
+        
+        # Frames
+        for frame in [self.sidebar_frame, self.list_frame, self.legend_frame]:
+            if hasattr(frame, 'configure'):
+                frame.configure(bg=self.theme["sidebar"]["bg"])
+        
+        # Legend
+        self.legend_title.configure(
+            fg=self.theme["sidebar"]["fg"],
+            bg=self.theme["sidebar"]["bg"]
+        )
+        
+        for label in self.legend_labels:
+            label.configure(
+                fg=self.theme["sidebar"]["fg"],
+                bg=self.theme["sidebar"]["bg"]
+            )
+            
+        # Update all project items
+        for item in self.project_items.values():
+            if hasattr(item, 'refresh_theme'):
+                item.refresh_theme()
+                
+    def _on_theme_toggle(self):
+        """Handle theme toggle button click."""
+        from config.settings import toggle_theme
+        new_theme = toggle_theme()
+        self.refresh_theme()
+        
+        if self.theme_callback:
+            self.theme_callback(new_theme)
+             
     def _on_create_new(self):
         """Handle create new project button click."""
         if self.create_callback:

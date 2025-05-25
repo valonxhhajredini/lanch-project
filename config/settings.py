@@ -23,31 +23,117 @@ PROJECT_TYPES = {
 
 # UI Configuration
 UI_CONFIG = {
-    "window_title": "Project Runner App V7 - Sidebar Design",
-    "colors": {
-        "label_fg": "black",
-        "label_bg": "#F0F0F0",
-        "entry_fg": "black",
-        "entry_bg": "white",
-        "output_text_fg": "black",
-        "output_text_bg": "white",
-        "output_cursor_bg": "black",
-        "readonly_bg": "#E0E0E0",
-        "button_select_color": "#D0D0D0",
-        "button_bg": "white"
-    },
+    "window_title": "Project Runner App V8 - Modern Themes",
     "dimensions": {
         "output_height": 15,
         "output_width": 70,
         "command_entry_width": 60,
-        "sidebar_width": 250,
-        "sidebar_item_height": 60
+        "sidebar_width": 280,
+        "sidebar_item_height": 70
+    }
+}
+
+# Theme configurations
+THEMES = {
+    "light": {
+        "name": "Light Theme",
+        "colors": {
+            "primary": "#007bff",
+            "success": "#28a745",
+            "danger": "#dc3545",
+            "warning": "#ffc107",
+            "info": "#17a2b8",
+            "light": "#f8f9fa",
+            "dark": "#343a40",
+            "white": "#ffffff",
+            "black": "#000000"
+        },
+        "main": {
+            "bg": "#ffffff",
+            "fg": "#212529",
+            "border": "#dee2e6"
+        },
+        "sidebar": {
+            "bg": "#f8f9fa",
+            "fg": "#495057",
+            "selected_bg": "#e3f2fd",
+            "hover_bg": "#e9ecef",
+            "border": "#dee2e6",
+            "header_bg": "#ffffff",
+            "header_fg": "#212529"
+        },
+        "content": {
+            "bg": "#ffffff",
+            "fg": "#212529",
+            "input_bg": "#ffffff",
+            "input_fg": "#495057",
+            "input_border": "#ced4da",
+            "readonly_bg": "#e9ecef",
+            "output_bg": "#ffffff",
+            "output_fg": "#212529"
+        },
+        "buttons": {
+            "primary_bg": "#007bff",
+            "primary_fg": "#ffffff",
+            "success_bg": "#28a745",
+            "success_fg": "#ffffff",
+            "danger_bg": "#dc3545",
+            "danger_fg": "#ffffff",
+            "secondary_bg": "#6c757d",
+            "secondary_fg": "#ffffff",
+            "light_bg": "#f8f9fa",
+            "light_fg": "#495057"
+        }
     },
-    "sidebar": {
-        "bg": "#f8f9fa",
-        "selected_bg": "#e3f2fd",
-        "hover_bg": "#f0f0f0",
-        "border_color": "#dee2e6"
+    "dark": {
+        "name": "Dark Theme",
+        "colors": {
+            "primary": "#0d6efd",
+            "success": "#198754",
+            "danger": "#dc3545",
+            "warning": "#fd7e14",
+            "info": "#0dcaf0",
+            "light": "#f8f9fa",
+            "dark": "#212529",
+            "white": "#ffffff",
+            "black": "#000000"
+        },
+        "main": {
+            "bg": "#1a1a1a",
+            "fg": "#e9ecef",
+            "border": "#495057"
+        },
+        "sidebar": {
+            "bg": "#2d3748",
+            "fg": "#e2e8f0",
+            "selected_bg": "#4a5568",
+            "hover_bg": "#374151",
+            "border": "#4a5568",
+            "header_bg": "#1a202c",
+            "header_fg": "#f7fafc"
+        },
+        "content": {
+            "bg": "#1a1a1a",
+            "fg": "#e9ecef",
+            "input_bg": "#2d3748",
+            "input_fg": "#e2e8f0",
+            "input_border": "#4a5568",
+            "readonly_bg": "#374151",
+            "output_bg": "#1e1e1e",
+            "output_fg": "#e9ecef"
+        },
+        "buttons": {
+            "primary_bg": "#0d6efd",
+            "primary_fg": "#ffffff",
+            "success_bg": "#198754",
+            "success_fg": "#ffffff",
+            "danger_bg": "#dc3545",
+            "danger_fg": "#ffffff",
+            "secondary_bg": "#6c757d",
+            "secondary_fg": "#ffffff",
+            "light_bg": "#495057",
+            "light_fg": "#e9ecef"
+        }
     }
 }
 
@@ -113,4 +199,26 @@ STATUS_CONFIG = {
         "stopping": "Stopping...",
         "created": "Ready"
     }
-} 
+}
+
+# Default theme and theme management
+DEFAULT_THEME = "light"
+CURRENT_THEME = DEFAULT_THEME
+
+def get_current_theme():
+    """Get the current theme configuration."""
+    return THEMES[CURRENT_THEME]
+
+def set_theme(theme_name):
+    """Set the current theme."""
+    global CURRENT_THEME
+    if theme_name in THEMES:
+        CURRENT_THEME = theme_name
+        return True
+    return False
+
+def toggle_theme():
+    """Toggle between light and dark themes."""
+    global CURRENT_THEME
+    CURRENT_THEME = "dark" if CURRENT_THEME == "light" else "light"
+    return CURRENT_THEME 
