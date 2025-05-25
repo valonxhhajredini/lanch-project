@@ -6,11 +6,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import queue
 import threading
+import os
 
-from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme
+from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme, set_theme
 from gui.widgets import CreateInstanceTab, ProjectInstanceTab, ProjectSidebar
 from core.process_manager import ProcessHandler, stream_output_worker, stop_process
 from core.port_manager import find_and_kill_process_on_port
+from core.database import get_database
 
 
 class MainWindow:
@@ -21,8 +23,12 @@ class MainWindow:
         self.root.title(UI_CONFIG["window_title"])
         self.root.geometry("1100x700")
         
+        # Database connection
+        self.db = get_database()
+        
         # Theme management
         self.theme = get_current_theme()
+        self._load_saved_theme()
         
         # Instance management
         self.instances = {}  # project_id -> instance data
@@ -34,6 +40,9 @@ class MainWindow:
         self._create_layout()
         self._setup_window_events()
         self._apply_theme()
+        
+        # Load saved projects
+        self._load_saved_projects()
         
     def _create_layout(self):
         """Create the main layout with sidebar and content area."""
@@ -63,9 +72,22 @@ class MainWindow:
         # Content frame
         self.content_frame.configure(bg=self.theme["content"]["bg"])
         
+    def _load_saved_theme(self):
+        """Load saved theme from database."""
+        saved_theme = self.db.load_app_setting("current_theme", "light")
+        if saved_theme in ["light", "dark"]:
+            set_theme(saved_theme)
+            self.theme = get_current_theme()
+            
+    def _save_current_theme(self):
+        """Save current theme to database."""
+        from config.settings import CURRENT_THEME
+        self.db.save_app_setting("current_theme", CURRENT_THEME)
+        
     def _on_theme_change(self, new_theme):
         """Handle theme change from sidebar."""
         self._apply_theme()
+        self._save_current_theme()
         
         # Refresh current content
         if self.current_project_id:
@@ -336,8 +358,13 @@ class MainWindow:
             'process_handler': process_handler,
             'output_queue': output_queue,
             'status': 'created',
-            'instance_tab': None  # Will be created when selected
+            'instance_tab': None,  # Will be created when selected
+            'working_directory': os.getcwd(),
+            'custom_command': None
         }
+        
+        # Save to database
+        self._save_project_to_db(project_id)
         
         # Add to sidebar
         self.sidebar.add_project(project_id, project_name, project_type)
@@ -364,6 +391,14 @@ class MainWindow:
                 instance['instance_number']
             )
             instance['instance_tab'] = instance_tab
+            
+            # Restore saved working directory and command
+            if 'working_directory' in instance and instance['working_directory']:
+                instance_tab.directory_selector.selected_directory.set(instance['working_directory'])
+            
+            if 'custom_command' in instance and instance['custom_command']:
+                instance_tab.command_entry.entry.delete(0, tk.END)
+                instance_tab.command_entry.entry.insert(0, instance['custom_command'])
             
             # Set up callbacks for this instance
             instance_tab.set_callbacks(
@@ -550,6 +585,8 @@ class MainWindow:
         if project_id in self.instances:
             self.instances[project_id]['status'] = status
             self.sidebar.update_project_status(project_id, status)
+            # Save status to database
+            self.db.update_project_status(project_id, status)
             
     def _on_project_delete(self, project_id):
         """Handle project deletion with confirmation."""
@@ -578,6 +615,9 @@ class MainWindow:
                 if process_handler.thread and process_handler.thread.is_alive():
                     process_handler.thread.join(timeout=1.0)
             
+            # Remove from database
+            self.db.delete_project(project_id)
+            
             # Remove from sidebar
             self.sidebar.remove_project(project_id)
             
@@ -596,6 +636,9 @@ class MainWindow:
         
     def _on_closing(self):
         """Handle window closing event."""
+        # Save current state
+        self._save_app_state()
+        
         # Stop all running processes
         for project_id, instance in self.instances.items():
             process_handler = instance['process_handler']
@@ -610,7 +653,130 @@ class MainWindow:
         if self.root.winfo_exists():
             self.root.destroy()
             
+    def _save_project_to_db(self, project_id):
+        """Save a project to the database."""
+        if project_id not in self.instances:
+            return
+            
+        instance = self.instances[project_id]
+        
+        # Get working directory and custom command if available
+        working_dir = instance.get('working_directory', os.getcwd())
+        custom_command = instance.get('custom_command')
+        
+        # If instance tab exists, get current values
+        if instance['instance_tab']:
+            try:
+                working_dir = instance['instance_tab'].directory_selector.get()
+                custom_command = instance['instance_tab'].command_entry.get()
+            except:
+                pass  # Use defaults if widgets don't exist
+        
+        self.db.save_project(
+            project_id=project_id,
+            name=instance['project_name'],
+            description=instance['description'],
+            project_type=instance['project_type'],
+            instance_number=instance['instance_number'],
+            working_directory=working_dir,
+            custom_command=custom_command,
+            status=instance['status']
+        )
+    
+    def _load_saved_projects(self):
+        """Load saved projects from database."""
+        try:
+            # Load project counters
+            saved_counters = self.db.load_project_counters()
+            if saved_counters:
+                self.instance_counters.update(saved_counters)
+            
+            # Load projects
+            saved_projects = self.db.load_projects()
+            
+            if not saved_projects:
+                return  # No saved projects
+            
+            # Find the highest project ID to set next_project_id
+            max_id = max((p['project_id'] for p in saved_projects), default=0)
+            self.next_project_id = max_id + 1
+            
+            # Restore projects
+            for project_data in saved_projects:
+                project_id = project_data['project_id']
+                
+                # Create process handler and output queue
+                process_handler = ProcessHandler()
+                output_queue = queue.Queue()
+                
+                # Restore instance data
+                self.instances[project_id] = {
+                    'project_name': project_data['name'],
+                    'project_type': project_data['project_type'],
+                    'instance_number': project_data['instance_number'],
+                    'description': project_data['description'] or '',
+                    'process_handler': process_handler,
+                    'output_queue': output_queue,
+                    'status': 'created',  # Reset status on startup
+                    'instance_tab': None,
+                    'working_directory': project_data['working_directory'] or os.getcwd(),
+                    'custom_command': project_data['custom_command']
+                }
+                
+                # Add to sidebar
+                self.sidebar.add_project(
+                    project_id, 
+                    project_data['name'], 
+                    project_data['project_type']
+                )
+            
+            # Load last selected project
+            last_selected = self.db.load_app_setting("last_selected_project")
+            if last_selected and int(last_selected) in self.instances:
+                self._on_project_select(int(last_selected))
+            elif self.instances:
+                # Select first project if no last selected
+                first_id = next(iter(self.instances))
+                self._on_project_select(first_id)
+                
+        except Exception as e:
+            print(f"Error loading saved projects: {e}")
+            # Continue with empty state if loading fails
+    
+    def _save_app_state(self):
+        """Save current application state."""
+        try:
+            # Save project counters
+            self.db.save_project_counters(self.instance_counters)
+            
+            # Save all projects
+            for project_id in self.instances:
+                self._save_project_to_db(project_id)
+            
+            # Save last selected project
+            if self.current_project_id:
+                self.db.save_app_setting("last_selected_project", str(self.current_project_id))
+                
+            # Save window geometry
+            geometry = self.root.geometry()
+            self.db.save_app_setting("window_geometry", geometry)
+            
+        except Exception as e:
+            print(f"Error saving application state: {e}")
+    
+    def _restore_window_geometry(self):
+        """Restore saved window geometry."""
+        try:
+            saved_geometry = self.db.load_app_setting("window_geometry")
+            if saved_geometry:
+                self.root.geometry(saved_geometry)
+        except Exception as e:
+            print(f"Error restoring window geometry: {e}")
+
     def run(self):
         """Start the main application loop."""
+        # Restore window geometry
+        self._restore_window_geometry()
+        
         if self.root.winfo_exists():
             self.root.mainloop() 
