@@ -497,6 +497,19 @@ class ProjectListItem:
         self.frame.bind("<Enter>", self._on_enter)
         self.frame.bind("<Leave>", self._on_leave)
         
+        # Delete button (pack first on the right to ensure it's always visible)
+        self.delete_button = tk.Button(
+            self.frame,
+            text="×",
+            font=("Helvetica", 12, "bold"),
+            fg="#dc3545",
+            bg=self.sidebar_colors["bg"],
+            relief=tk.FLAT,
+            width=2,
+            command=self._on_delete
+        )
+        self.delete_button.pack(side=tk.RIGHT, padx=(5, 10), pady=10)
+        
         # Status indicator
         self.status_label = tk.Label(
             self.frame,
@@ -509,15 +522,19 @@ class ProjectListItem:
         self.status_label.pack(side=tk.LEFT, padx=(10, 5), pady=10)
         self.status_label.bind("<Button-1>", self._on_click)
         
-        # Project info frame
+        # Project info frame (fills remaining space between status and delete button)
         info_frame = tk.Frame(self.frame, bg=self.sidebar_colors["bg"])
-        info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 10), pady=5)
+        info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 5), pady=5)
         info_frame.bind("<Button-1>", self._on_click)
         
-        # Project name
+        # Project name (truncate if too long)
+        display_name = self.project_name
+        if len(display_name) > 20:  # Truncate long names
+            display_name = display_name[:17] + "..."
+            
         self.name_label = tk.Label(
             info_frame,
-            text=self.project_name,
+            text=display_name,
             font=("Helvetica", 11, "bold"),
             fg=self.colors["label_fg"],
             bg=self.sidebar_colors["bg"],
@@ -537,19 +554,6 @@ class ProjectListItem:
         )
         self.status_text_label.pack(fill=tk.X)
         self.status_text_label.bind("<Button-1>", self._on_click)
-        
-        # Delete button
-        self.delete_button = tk.Button(
-            self.frame,
-            text="×",
-            font=("Helvetica", 12, "bold"),
-            fg="#dc3545",
-            bg=self.sidebar_colors["bg"],
-            relief=tk.FLAT,
-            width=2,
-            command=self._on_delete
-        )
-        self.delete_button.pack(side=tk.RIGHT, padx=(5, 10), pady=10)
         
     def _on_click(self, event):
         """Handle click on project item."""
