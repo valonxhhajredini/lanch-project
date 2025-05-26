@@ -131,10 +131,11 @@ class OutputTextWidget(ThemedWidget):
         return self.widget.winfo_exists()
 
 
-class ProjectTypeSelector:
+class ProjectTypeSelector(ThemedWidget):
     """Widget for selecting project type with radio buttons."""
     
     def __init__(self, parent, on_change_callback=None):
+        super().__init__()
         self.parent = parent
         self.on_change_callback = on_change_callback
         
@@ -144,30 +145,57 @@ class ProjectTypeSelector:
             self.project_type.trace_add("write", self._on_change)
             
         self._create_widgets()
+        self.apply_theme()
         
     def _create_widgets(self):
         """Create the radio button widgets."""
-        tk.Label(
+        self.label = tk.Label(
             self.parent, 
             text="Project Type:", 
-            fg="#333333", 
-            bg="#ffffff", 
+            font=("SF Pro Display", 12, "bold"),
             padx=5
-        ).pack(side=tk.LEFT)
+        )
+        self.label.pack(side=tk.LEFT)
+        
+        # Store radio buttons for theming
+        self.radio_buttons = []
         
         # Create radio buttons for each project type
         for project_type in ["Custom", "Laravel", "Angular"]:
-            tk.Radiobutton(
+            rb = tk.Radiobutton(
                 self.parent, 
                 text=project_type, 
                 variable=self.project_type, 
                 value=project_type, 
                 indicatoron=0, 
-                padx=10, 
-                fg="#333333", 
-                selectcolor="#007bff", 
-                bg="#f8f9fa"
-            ).pack(side=tk.RIGHT, padx=2)
+                padx=15, 
+                pady=8,
+                font=("SF Pro Display", 10, "bold"),
+                relief=tk.FLAT,
+                borderwidth=0,
+                cursor="hand2"
+            )
+            rb.pack(side=tk.RIGHT, padx=2)
+            self.radio_buttons.append(rb)
+            
+    def apply_theme(self):
+        """Apply current theme to project type selector."""
+        # Label styling
+        self.label.configure(
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
+        )
+        
+        # Radio button styling
+        for rb in self.radio_buttons:
+            rb.configure(
+                fg=self.theme["content"]["fg"],
+                bg=self.theme["content"]["bg"],
+                selectcolor=self.theme["colors"]["primary"],
+                activebackground=self.theme["content"]["bg"],
+                activeforeground=self.theme["content"]["fg"],
+                highlightthickness=0
+            )
             
     def _on_change(self, *args):
         """Handle project type change."""
@@ -179,10 +207,11 @@ class ProjectTypeSelector:
         return self.project_type.get()
 
 
-class DirectorySelector:
+class DirectorySelector(ThemedWidget):
     """Widget for selecting working directory."""
     
     def __init__(self, parent, initial_dir=None):
+        super().__init__()
         self.parent = parent
         
         # Initialize directory variable
@@ -190,34 +219,69 @@ class DirectorySelector:
         self.selected_directory = tk.StringVar(value=initial_dir or os.getcwd())
         
         self._create_widgets()
+        self.apply_theme()
         
     def _create_widgets(self):
         """Create the directory selection widgets."""
-        tk.Label(
+        self.label = tk.Label(
             self.parent, 
             text="Working Directory:", 
-            fg="#333333", 
-            bg="#ffffff", 
+            font=("SF Pro Display", 12, "bold"),
             padx=5
-        ).pack(side=tk.LEFT)
+        )
+        self.label.pack(side=tk.LEFT)
         
         self.dir_label = tk.Label(
             self.parent, 
             textvariable=self.selected_directory, 
-            relief=tk.SUNKEN, 
-            fg="#495057", 
-            bg="#ffffff", 
-            padx=10, 
-            anchor=tk.W
+            relief=tk.FLAT, 
+            borderwidth=1,
+            padx=15, 
+            pady=8,
+            anchor=tk.W,
+            font=("SF Pro Display", 11)
         )
         self.dir_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         self.browse_button = tk.Button(
             self.parent, 
             text="Browse", 
-            command=self._browse_directory
+            command=self._browse_directory,
+            font=("SF Pro Display", 11, "bold"),
+            relief=tk.FLAT,
+            borderwidth=0,
+            padx=20,
+            pady=8,
+            cursor="hand2",
+            fg="#ffffff"
         )
         self.browse_button.pack(side=tk.RIGHT, padx=5)
+        
+    def apply_theme(self):
+        """Apply current theme to directory selector."""
+        # Label styling
+        self.label.configure(
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
+        )
+        
+        # Directory display styling
+        self.dir_label.configure(
+            fg=self.theme["content"]["input_fg"],
+            bg=self.theme["content"]["input_bg"],
+            highlightbackground=self.theme["content"]["input_border"],
+            highlightcolor=self.theme["colors"]["primary"]
+        )
+        
+        # Browse button styling
+        self.browse_button.configure(
+            bg=self.theme["buttons"]["primary_bg"],
+            fg="#ffffff",
+            activebackground=self.theme["colors"]["primary"],
+            activeforeground="#ffffff",
+            highlightthickness=0,
+            font=("SF Pro Display", 11, "bold")
+        )
         
     def _browse_directory(self):
         """Open directory browser dialog."""
@@ -231,33 +295,56 @@ class DirectorySelector:
         return self.selected_directory.get()
 
 
-class CommandEntry:
+class CommandEntry(ThemedWidget):
     """Widget for command input with project-specific behavior."""
     
     def __init__(self, parent):
+        super().__init__()
         self.parent = parent
         self.dimensions = UI_CONFIG["dimensions"]
         
         self._create_widgets()
+        self.apply_theme()
         
     def _create_widgets(self):
         """Create the command entry widgets."""
-        tk.Label(
+        self.label = tk.Label(
             self.parent, 
             text="Command:", 
-            fg="#333333", 
-            bg="#ffffff", 
+            font=("SF Pro Display", 12, "bold"),
             padx=5
-        ).pack(side=tk.LEFT)
+        )
+        self.label.pack(side=tk.LEFT)
         
         self.entry = tk.Entry(
             self.parent, 
             width=self.dimensions["command_entry_width"], 
-            fg="#495057", 
-            bg="#ffffff", 
-            relief=tk.SUNKEN
+            relief=tk.FLAT,
+            borderwidth=1,
+            highlightthickness=1,
+            font=("SF Pro Display", 11),
+            insertwidth=2
         )
         self.entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+    def apply_theme(self):
+        """Apply current theme to command entry."""
+        # Label styling
+        self.label.configure(
+            fg=self.theme["content"]["fg"],
+            bg=self.theme["content"]["bg"]
+        )
+        
+        # Entry styling
+        self.entry.configure(
+            fg=self.theme["content"]["input_fg"],
+            bg=self.theme["content"]["input_bg"],
+            insertbackground=self.theme["content"]["fg"],
+            highlightbackground=self.theme["content"]["input_border"],
+            highlightcolor=self.theme["colors"]["primary"],
+            selectbackground=self.theme["colors"]["primary"],
+            selectforeground=self.theme["content"]["bg"]
+        )
         
     def update_for_project_type(self, project_type):
         """Update the command entry based on project type."""
@@ -265,19 +352,27 @@ class CommandEntry:
         
         project_config = PROJECT_TYPES.get(project_type, PROJECT_TYPES["Custom"])
         
-        self.entry.configure(state='normal', fg="#495057", bg="#ffffff")
+        self.entry.configure(
+            state='normal', 
+            fg=self.theme["content"]["input_fg"], 
+            bg=self.theme["content"]["input_bg"]
+        )
         self.entry.delete(0, tk.END)
         
         if project_config["readonly"]:
             self.entry.insert(0, project_config["command"])
             self.entry.configure(
                 state='readonly', 
-                fg="#495057", 
-                readonlybackground="#e9ecef", 
-                bg="#e9ecef"
+                fg=self.theme["content"]["input_fg"], 
+                readonlybackground=self.theme["content"]["readonly_bg"], 
+                bg=self.theme["content"]["readonly_bg"]
             )
         else:
-            self.entry.configure(state='normal', fg="#495057", bg="#ffffff")
+            self.entry.configure(
+                state='normal', 
+                fg=self.theme["content"]["input_fg"], 
+                bg=self.theme["content"]["input_bg"]
+            )
             
     def get(self):
         """Get the current command."""
@@ -358,10 +453,11 @@ class EditorSelector(ThemedWidget):
                 compound=tk.TOP,
                 font=("SF Pro Display", 9),
                 relief=tk.FLAT,
-                borderwidth=2,
+                borderwidth=0,
                 padx=8,
                 pady=5,
                 cursor="hand2",
+                highlightthickness=0,
                 command=lambda eid=editor_id: self._on_editor_click(eid)
             )
         else:
@@ -370,10 +466,11 @@ class EditorSelector(ThemedWidget):
                 text=editor_info["name"],
                 font=("SF Pro Display", 10),
                 relief=tk.FLAT,
-                borderwidth=2,
+                borderwidth=0,
                 padx=15,
                 pady=8,
                 cursor="hand2",
+                highlightthickness=0,
                 command=lambda eid=editor_id: self._on_editor_click(eid)
             )
             
@@ -454,15 +551,17 @@ class EditorSelector(ThemedWidget):
             button.configure(
                 bg=self.theme["colors"]["primary"],
                 fg=self.theme["content"]["bg"],
-                relief=tk.RAISED,
-                borderwidth=2
+                relief=tk.FLAT,
+                borderwidth=0,
+                highlightthickness=0
             )
         else:
             button.configure(
                 bg=self.theme["content"]["bg"],
                 fg=self.theme["content"]["fg"],
                 relief=tk.FLAT,
-                borderwidth=1
+                borderwidth=0,
+                highlightthickness=0
             )
             
     def apply_theme(self):
@@ -480,32 +579,59 @@ class EditorSelector(ThemedWidget):
         return self.selected_editor.get()
 
 
-class ControlButtons:
-    """Widget for run/stop control buttons."""
+class ControlButtons(ThemedWidget):
+    """Widget for run/stop control buttons with modern styling."""
     
     def __init__(self, parent, run_callback=None, stop_callback=None):
+        super().__init__()
         self.parent = parent
         self.run_callback = run_callback
         self.stop_callback = stop_callback
         
         self._create_widgets()
+        self.apply_theme()
         
     def _create_widgets(self):
-        """Create the control buttons."""
-        self.run_button = tk.Button(
-            self.parent, 
-            text="Run Command", 
-            command=self._on_run
-        )
-        self.run_button.pack(side=tk.LEFT, padx=5)
+        """Create the modern control buttons."""
+        # Create a container frame for better layout
+        self.button_container = tk.Frame(self.parent)
+        self.button_container.pack(fill=tk.X, pady=10)
         
-        self.stop_button = tk.Button(
-            self.parent, 
-            text="Stop Command", 
-            command=self._on_stop, 
-            state=tk.DISABLED
+        # Run button with icon and modern styling
+        self.run_button = tk.Button(
+            self.button_container,
+            text="▶ Run Command",
+            command=self._on_run,
+            font=("SF Pro Display", 12, "bold"),
+            relief=tk.FLAT,
+            borderwidth=0,
+            padx=20,
+            pady=12,
+            cursor="hand2",
+            compound=tk.LEFT,
+            fg="#1a1a1a"
         )
-        self.stop_button.pack(side=tk.LEFT, padx=5)
+        self.run_button.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
+        
+        # Stop button with icon and modern styling
+        self.stop_button = tk.Button(
+            self.button_container,
+            text="⏹ Stop Command",
+            command=self._on_stop,
+            font=("SF Pro Display", 12, "bold"),
+            relief=tk.FLAT,
+            borderwidth=0,
+            padx=20,
+            pady=12,
+            cursor="hand2",
+            state=tk.DISABLED,
+            compound=tk.LEFT,
+            fg="#ffffff"
+        )
+        self.stop_button.pack(side=tk.LEFT, padx=(10, 0), fill=tk.X, expand=True)
+        
+        # Bind hover effects
+        self._bind_hover_effects()
         
     def _on_run(self):
         """Handle run button click."""
@@ -528,6 +654,67 @@ class ControlButtons:
         state = tk.NORMAL if enabled else tk.DISABLED
         if self.stop_button.winfo_exists():
             self.stop_button.config(state=state)
+            
+    def _bind_hover_effects(self):
+        """Bind hover effects to buttons."""
+        # Run button hover effects
+        self.run_button.bind("<Enter>", lambda e: self._on_run_hover_enter())
+        self.run_button.bind("<Leave>", lambda e: self._on_run_hover_leave())
+        
+        # Stop button hover effects
+        self.stop_button.bind("<Enter>", lambda e: self._on_stop_hover_enter())
+        self.stop_button.bind("<Leave>", lambda e: self._on_stop_hover_leave())
+        
+    def _on_run_hover_enter(self):
+        """Handle run button hover enter."""
+        if self.run_button['state'] != tk.DISABLED:
+            self.run_button.configure(bg=self.theme["colors"]["success_hover"])
+            
+    def _on_run_hover_leave(self):
+        """Handle run button hover leave."""
+        if self.run_button['state'] != tk.DISABLED:
+            self.run_button.configure(bg=self.theme["colors"]["success"])
+            
+    def _on_stop_hover_enter(self):
+        """Handle stop button hover enter."""
+        if self.stop_button['state'] != tk.DISABLED:
+            self.stop_button.configure(bg=self.theme["colors"]["danger_hover"])
+            
+    def _on_stop_hover_leave(self):
+        """Handle stop button hover leave."""
+        if self.stop_button['state'] != tk.DISABLED:
+            self.stop_button.configure(bg=self.theme["colors"]["danger"])
+            
+    def apply_theme(self):
+        """Apply current theme to control buttons."""
+        # Container frame
+        self.button_container.configure(bg=self.theme["content"]["bg"])
+        
+        # Run button styling
+        self.run_button.configure(
+            bg=self.theme["colors"]["success"],
+            fg="#1a1a1a",
+            activebackground=self.theme["colors"]["success_hover"],
+            activeforeground="#1a1a1a",
+            disabledforeground="#999999",
+            highlightthickness=0,
+            font=("SF Pro Display", 12, "bold")
+        )
+        
+        # Stop button styling
+        self.stop_button.configure(
+            bg=self.theme["colors"]["danger"],
+            fg="#ffffff",
+            activebackground=self.theme["colors"]["danger_hover"],
+            activeforeground="#ffffff",
+            disabledforeground="#999999",
+            highlightthickness=0,
+            font=("SF Pro Display", 12, "bold")
+        )
+        
+        # Update disabled button appearance
+        if self.stop_button['state'] == tk.DISABLED:
+            self.stop_button.configure(bg="#cccccc")
             
     def winfo_exists(self):
         """Check if widgets exist."""
@@ -754,6 +941,15 @@ class ProjectInstanceTab(ThemedWidget):
             
         if hasattr(self, 'editor_selector'):
             self.editor_selector.refresh_theme()
+            
+        if hasattr(self, 'control_buttons'):
+            self.control_buttons.refresh_theme()
+            
+        if hasattr(self, 'directory_selector'):
+            self.directory_selector.refresh_theme()
+            
+        if hasattr(self, 'command_entry'):
+            self.command_entry.refresh_theme()
 
 
 class ProjectListItem(ThemedWidget):
@@ -1081,9 +1277,11 @@ class ProjectSidebar(ThemedWidget):
             font=("SF Pro Display", 14),
             command=self._on_theme_toggle,
             relief=tk.FLAT,
+            borderwidth=0,
             width=3,
             height=1,
-            cursor="hand2"
+            cursor="hand2",
+            highlightthickness=0
         )
         self.theme_button.pack(side=tk.RIGHT)
         
@@ -1092,13 +1290,19 @@ class ProjectSidebar(ThemedWidget):
             self.sidebar_frame,
             text="+ Create New Project",
             command=self._on_create_new,
-            font=("SF Pro Display", 11, "bold"),
+            font=("SF Pro Display", 12, "bold"),
             relief=tk.FLAT,
+            borderwidth=0,
             padx=20,
             pady=12,
-            cursor="hand2"
+            cursor="hand2",
+            highlightthickness=0,
+            fg="#1a1a1a"
         )
         self.create_button.pack(fill=tk.X, padx=15, pady=(5, 20))
+        
+        # Add hover effects for buttons
+        self._bind_button_hover_effects()
         
         # Scrollable project list
         self.list_frame = tk.Frame(self.sidebar_frame)
@@ -1127,6 +1331,32 @@ class ProjectSidebar(ThemedWidget):
             self.legend_labels.append(label)
             
         self.apply_theme()
+        
+    def _bind_button_hover_effects(self):
+        """Bind hover effects to sidebar buttons."""
+        # Theme button hover effects
+        self.theme_button.bind("<Enter>", self._on_theme_button_hover_enter)
+        self.theme_button.bind("<Leave>", self._on_theme_button_hover_leave)
+        
+        # Create button hover effects
+        self.create_button.bind("<Enter>", self._on_create_button_hover_enter)
+        self.create_button.bind("<Leave>", self._on_create_button_hover_leave)
+        
+    def _on_theme_button_hover_enter(self, event):
+        """Handle theme button hover enter."""
+        self.theme_button.configure(bg=self.theme["sidebar"]["hover_bg"])
+        
+    def _on_theme_button_hover_leave(self, event):
+        """Handle theme button hover leave."""
+        self.theme_button.configure(bg=self.theme["buttons"]["light_bg"])
+        
+    def _on_create_button_hover_enter(self, event):
+        """Handle create button hover enter."""
+        self.create_button.configure(bg=self.theme["colors"]["success_hover"])
+        
+    def _on_create_button_hover_leave(self, event):
+        """Handle create button hover leave."""
+        self.create_button.configure(bg=self.theme["buttons"]["success_bg"])
             
     def apply_theme(self):
         """Apply current theme to sidebar."""
@@ -1146,14 +1376,21 @@ class ProjectSidebar(ThemedWidget):
             bg=self.theme["buttons"]["light_bg"],
             fg=self.theme["buttons"]["light_fg"],
             activebackground=self.theme["sidebar"]["hover_bg"],
-            text=theme_icon
+            activeforeground=self.theme["buttons"]["light_fg"],
+            text=theme_icon,
+            highlightthickness=0,
+            borderwidth=0
         )
         
         # Create button
         self.create_button.configure(
             bg=self.theme["buttons"]["success_bg"],
-            fg=self.theme["buttons"]["success_fg"],
-            activebackground=self.theme["colors"]["success"]
+            fg="#1a1a1a",
+            activebackground=self.theme["colors"]["success"],
+            activeforeground="#1a1a1a",
+            highlightthickness=0,
+            borderwidth=0,
+            font=("SF Pro Display", 12, "bold")
         )
         
         # Frames

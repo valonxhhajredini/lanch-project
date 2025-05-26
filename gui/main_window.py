@@ -284,41 +284,68 @@ class MainWindow:
             )
             rb.pack(fill=tk.X, pady=8, padx=10)
         
-        # Create buttons in the fixed bottom frame
-        # Cancel button
+        # Create buttons in the fixed bottom frame with modern styling
+        # Cancel button with enhanced styling
         cancel_btn = tk.Button(
             bottom_frame,
             text="Cancel",
             command=dialog.destroy,
-            font=("SF Pro Display", 11),
+            font=("SF Pro Display", 13, "bold"),
             bg=self.theme["buttons"]["secondary_bg"],
-            fg=self.theme["buttons"]["secondary_fg"],
+            fg="#2c3e50",
+            activebackground=self.theme["sidebar"]["hover_bg"],
+            activeforeground="#2c3e50",
             relief=tk.FLAT,
-            padx=25,
-            pady=10,
-            cursor="hand2"
+            borderwidth=0,
+            padx=30,
+            pady=15,
+            cursor="hand2",
+            highlightthickness=0
         )
         cancel_btn.pack(side=tk.RIGHT, padx=(15, 0))
         
-        # Create button
+        # Create button with enhanced styling
         create_btn = tk.Button(
             bottom_frame,
-            text="Create Project",
+            text="✓ Create Project",
             command=lambda: self._create_project_from_dialog(
                 dialog, 
                 selected_type.get(), 
                 project_name_entry.get().strip(),
                 project_desc_entry.get().strip()
             ),
-            font=("SF Pro Display", 11, "bold"),
+            font=("SF Pro Display", 13, "bold"),
             bg=self.theme["buttons"]["success_bg"],
-            fg=self.theme["buttons"]["success_fg"],
+            fg="#1a1a1a",
+            activebackground=self.theme["colors"]["success_hover"],
+            activeforeground="#1a1a1a",
             relief=tk.FLAT,
-            padx=25,
-            pady=10,
-            cursor="hand2"
+            borderwidth=0,
+            padx=30,
+            pady=15,
+            cursor="hand2",
+            highlightthickness=0
         )
         create_btn.pack(side=tk.RIGHT)
+        
+        # Add hover effects for better UX
+        def on_cancel_hover_enter(event):
+            cancel_btn.configure(bg=self.theme["sidebar"]["hover_bg"])
+        
+        def on_cancel_hover_leave(event):
+            cancel_btn.configure(bg=self.theme["buttons"]["secondary_bg"])
+            
+        def on_create_hover_enter(event):
+            create_btn.configure(bg=self.theme["colors"]["success_hover"])
+        
+        def on_create_hover_leave(event):
+            create_btn.configure(bg=self.theme["buttons"]["success_bg"])
+        
+        # Bind hover effects
+        cancel_btn.bind("<Enter>", on_cancel_hover_enter)
+        cancel_btn.bind("<Leave>", on_cancel_hover_leave)
+        create_btn.bind("<Enter>", on_create_hover_enter)
+        create_btn.bind("<Leave>", on_create_hover_leave)
         
         # Bind Enter key to create button
         dialog.bind('<Return>', lambda e: create_btn.invoke())

@@ -40,7 +40,9 @@ THEMES = {
         "colors": {
             "primary": "#007bff",
             "success": "#28a745",
+            "success_hover": "#218838",
             "danger": "#dc3545",
+            "danger_hover": "#c82333",
             "warning": "#ffc107",
             "info": "#17a2b8",
             "light": "#f8f9fa",
@@ -90,7 +92,9 @@ THEMES = {
         "colors": {
             "primary": "#0d6efd",
             "success": "#198754",
+            "success_hover": "#157347",
             "danger": "#dc3545",
+            "danger_hover": "#bb2d3b",
             "warning": "#fd7e14",
             "info": "#0dcaf0",
             "light": "#f8f9fa",
