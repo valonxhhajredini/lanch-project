@@ -4,7 +4,16 @@ Custom widgets and UI components for Project Runner App.
 
 import tkinter as tk
 from tkinter import scrolledtext, ttk
+import os
 from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme
+
+# Try to import PIL, fallback gracefully if not available
+try:
+    from PIL import Image, ImageTk
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    print("PIL (Pillow) not available. Editor icons will be text-only.")
 
 
 class ThemedWidget:
@@ -279,6 +288,198 @@ class CommandEntry:
         return self.entry.winfo_exists()
 
 
+class EditorSelector(ThemedWidget):
+    """Widget for selecting code editor with icons."""
+    
+    def __init__(self, parent, get_directory_callback=None):
+        super().__init__()
+        self.parent = parent
+        self.get_directory_callback = get_directory_callback
+        self.selected_editor = tk.StringVar(value="vscode")
+        
+        # Editor configurations with their command line tools
+        self.editors = {
+            "cursor": {"name": "Cursor", "icon": "cursor.png", "command": "cursor"},
+            "vscode": {"name": "VS Code", "icon": "vscode.png", "command": "code"},
+            "phpstorm": {"name": "PhpStorm", "icon": "phpstorm.png", "command": "phpstorm"},
+            "webstorm": {"name": "WebStorm", "icon": "webstorm.png", "command": "webstorm"}
+        }
+        
+        self._create_widgets()
+        
+    def _create_widgets(self):
+        """Create the editor selection widgets."""
+        # Title label
+        tk.Label(
+            self.parent,
+            text="Open in Editor:",
+            font=("SF Pro Display", 12, "bold"),
+            padx=5
+        ).pack(anchor=tk.W, pady=(5, 10))
+        
+        # Editor buttons frame
+        self.editor_frame = tk.Frame(self.parent)
+        self.editor_frame.pack(fill=tk.X, padx=5, pady=(0, 10))
+        
+        self.editor_buttons = {}
+        self.editor_icons = {}
+        
+        # Load icons and create buttons
+        for editor_id, editor_info in self.editors.items():
+            self._create_editor_button(editor_id, editor_info)
+            
+    def _create_editor_button(self, editor_id, editor_info):
+        """Create a button for an editor with its icon."""
+        photo = None
+        
+        if PIL_AVAILABLE:
+            try:
+                # Load and resize icon
+                icon_path = os.path.join("assets", "icons", editor_info["icon"])
+                if os.path.exists(icon_path):
+                    image = Image.open(icon_path)
+                    image = image.resize((32, 32), Image.Resampling.LANCZOS)
+                    photo = ImageTk.PhotoImage(image)
+                    self.editor_icons[editor_id] = photo
+            except Exception as e:
+                print(f"Error loading icon for {editor_info['name']}: {e}")
+                photo = None
+            
+        # Create button frame
+        button_frame = tk.Frame(self.editor_frame)
+        button_frame.pack(side=tk.LEFT, padx=5)
+        
+        # Create button
+        if photo:
+            button = tk.Button(
+                button_frame,
+                image=photo,
+                text=editor_info["name"],
+                compound=tk.TOP,
+                font=("SF Pro Display", 9),
+                relief=tk.FLAT,
+                borderwidth=2,
+                padx=8,
+                pady=5,
+                cursor="hand2",
+                command=lambda eid=editor_id: self._on_editor_click(eid)
+            )
+        else:
+            button = tk.Button(
+                button_frame,
+                text=editor_info["name"],
+                font=("SF Pro Display", 10),
+                relief=tk.FLAT,
+                borderwidth=2,
+                padx=15,
+                pady=8,
+                cursor="hand2",
+                command=lambda eid=editor_id: self._on_editor_click(eid)
+            )
+            
+        button.pack()
+        self.editor_buttons[editor_id] = button
+        
+        # Apply initial styling
+        self._update_button_style(editor_id)
+        
+    def _on_editor_click(self, editor_id):
+        """Handle editor button click - select and open project."""
+        # First select the editor
+        self._select_editor(editor_id)
+        
+        # Then try to open the project in the selected editor
+        self._open_in_editor(editor_id)
+        
+    def _select_editor(self, editor_id):
+        """Handle editor selection."""
+        self.selected_editor.set(editor_id)
+        
+        # Update button styles
+        for eid in self.editors:
+            self._update_button_style(eid)
+            
+    def _open_in_editor(self, editor_id):
+        """Open the current project directory in the specified editor."""
+        if not self.get_directory_callback:
+            return
+            
+        try:
+            # Get the current project directory
+            project_dir = self.get_directory_callback()
+            if not project_dir:
+                print(f"No project directory available")
+                return
+                
+            # Get the command for the editor
+            editor_info = self.editors.get(editor_id)
+            if not editor_info:
+                print(f"Unknown editor: {editor_id}")
+                return
+                
+            command = editor_info["command"]
+            
+            # Execute the command to open the project
+            import subprocess
+            import os
+            
+            # Check if the command exists
+            try:
+                subprocess.run([command, "--version"], capture_output=True, check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                print(f"Editor '{command}' not found. Please install {editor_info['name']} and ensure it's in your PATH.")
+                return
+            
+            # Open the project directory
+            print(f"Opening project in {editor_info['name']}: {project_dir}")
+            subprocess.Popen([command, project_dir])
+            
+            # Show success message in the UI if possible
+            self._show_status_message(f"Opened in {editor_info['name']}")
+            
+        except Exception as e:
+            print(f"Error opening project in {editor_info['name']}: {e}")
+            self._show_status_message(f"Failed to open {editor_info['name']}")
+            
+    def _show_status_message(self, message):
+        """Show a status message (can be enhanced with actual UI feedback later)."""
+        print(f"Status: {message}")
+            
+    def _update_button_style(self, editor_id):
+        """Update button style based on selection state."""
+        button = self.editor_buttons[editor_id]
+        is_selected = self.selected_editor.get() == editor_id
+        
+        if is_selected:
+            button.configure(
+                bg=self.theme["colors"]["primary"],
+                fg=self.theme["content"]["bg"],
+                relief=tk.RAISED,
+                borderwidth=2
+            )
+        else:
+            button.configure(
+                bg=self.theme["content"]["bg"],
+                fg=self.theme["content"]["fg"],
+                relief=tk.FLAT,
+                borderwidth=1
+            )
+            
+    def apply_theme(self):
+        """Apply current theme to editor selector."""
+        # Update all button styles
+        for editor_id in self.editors:
+            self._update_button_style(editor_id)
+            
+        # Update frame background
+        if hasattr(self, 'editor_frame'):
+            self.editor_frame.configure(bg=self.theme["content"]["bg"])
+            
+    def get_selected_editor(self):
+        """Get the currently selected editor."""
+        return self.selected_editor.get()
+
+
 class ControlButtons:
     """Widget for run/stop control buttons."""
     
@@ -456,6 +657,12 @@ class ProjectInstanceTab(ThemedWidget):
         self.command_entry = CommandEntry(self.command_frame)
         self.command_entry.update_for_project_type(self.project_type)
         
+        # Editor selector
+        self.editor_selector = EditorSelector(
+            self.editor_frame, 
+            get_directory_callback=lambda: self.directory_selector.get()
+        )
+        
         # Output display
         self.output_label = tk.Label(
             self.output_frame,
@@ -485,6 +692,9 @@ class ProjectInstanceTab(ThemedWidget):
 
         self.command_frame = tk.Frame(self.main_frame)
         self.command_frame.pack(pady=5, padx=10, fill=tk.X)
+
+        self.editor_frame = tk.Frame(self.main_frame)
+        self.editor_frame.pack(pady=5, padx=10, fill=tk.X)
 
         self.output_frame = tk.Frame(self.main_frame)
         self.output_frame.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
@@ -518,7 +728,7 @@ class ProjectInstanceTab(ThemedWidget):
         self.main_frame.configure(bg=self.theme["content"]["bg"])
         
         # All sub-frames
-        frames = ['project_type_frame', 'dir_frame', 'command_frame', 'output_frame', 'button_frame']
+        frames = ['project_type_frame', 'dir_frame', 'command_frame', 'editor_frame', 'output_frame', 'button_frame']
         for frame_name in frames:
             if hasattr(self, frame_name):
                 frame = getattr(self, frame_name)
@@ -541,6 +751,9 @@ class ProjectInstanceTab(ThemedWidget):
         # Refresh themed widgets
         if hasattr(self, 'output_widget'):
             self.output_widget.refresh_theme()
+            
+        if hasattr(self, 'editor_selector'):
+            self.editor_selector.refresh_theme()
 
 
 class ProjectListItem(ThemedWidget):
