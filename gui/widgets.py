@@ -1062,12 +1062,12 @@ class ProjectSidebar(ThemedWidget):
         self.sidebar_frame.pack_propagate(False)  # Maintain fixed width
         
         # Header with theme toggle
-        header_frame = tk.Frame(self.sidebar_frame)
-        header_frame.pack(fill=tk.X, padx=15, pady=(15, 10))
+        self.header_frame = tk.Frame(self.sidebar_frame)
+        self.header_frame.pack(fill=tk.X, padx=15, pady=(15, 10))
         
         # Projects title
         self.title_label = tk.Label(
-            header_frame,
+            self.header_frame,
             text="Projects",
             font=("SF Pro Display", 16, "bold"),
             anchor=tk.W
@@ -1076,7 +1076,7 @@ class ProjectSidebar(ThemedWidget):
         
         # Theme toggle button
         self.theme_button = tk.Button(
-            header_frame,
+            self.header_frame,
             text="🌙",
             font=("SF Pro Display", 14),
             command=self._on_theme_toggle,
@@ -1157,7 +1157,7 @@ class ProjectSidebar(ThemedWidget):
         )
         
         # Frames
-        for frame in [self.sidebar_frame, self.list_frame, self.legend_frame]:
+        for frame in [self.sidebar_frame, self.header_frame, self.list_frame, self.legend_frame]:
             if hasattr(frame, 'configure'):
                 frame.configure(bg=self.theme["sidebar"]["bg"])
         
