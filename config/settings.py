@@ -225,4 +225,23 @@ def toggle_theme():
     """Toggle between light and dark themes."""
     global CURRENT_THEME
     CURRENT_THEME = "dark" if CURRENT_THEME == "light" else "light"
-    return THEMES[CURRENT_THEME] 
+    return THEMES[CURRENT_THEME]
+
+# Performance optimization constants
+PERFORMANCE_CONFIG = {
+    "max_output_lines": 1000,        # Limit output buffer size
+    "ui_update_batch_size": 50,      # Process UI updates in batches
+    "memory_cleanup_interval": 30,   # Seconds between memory cleanup
+    "max_concurrent_processes": 5,   # Limit concurrent processes
+    "output_buffer_size": 8192,      # Buffer size for process output
+    "widget_cache_size": 100         # Maximum cached widgets
+}
+
+# Database optimization settings
+DATABASE_CONFIG = {
+    "batch_size": 100,               # Batch database operations
+    "connection_timeout": 30,        # Database connection timeout
+    "retry_attempts": 3,             # Number of retry attempts
+    "cache_ttl": 300,               # Cache time-to-live in seconds
+    "vacuum_interval": 86400         # Database vacuum interval (24 hours)
+} 

@@ -1,11 +1,15 @@
 """
 Custom widgets and UI components for Project Runner App.
+Optimized for better performance and memory management.
 """
 
 import tkinter as tk
 from tkinter import scrolledtext, ttk
 import os
-from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme
+import time
+import weakref
+from collections import deque
+from config.settings import UI_CONFIG, OUTPUT_TAGS, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme, PERFORMANCE_CONFIG
 
 # Try to import PIL, fallback gracefully if not available
 try:
@@ -16,31 +20,90 @@ except ImportError:
     print("PIL (Pillow) not available. Editor icons will be text-only.")
 
 
+class WidgetCache:
+    """Cache system for frequently used widgets to improve performance."""
+    
+    def __init__(self, max_size=PERFORMANCE_CONFIG["widget_cache_size"]):
+        self._cache = {}
+        self._access_times = {}
+        self._max_size = max_size
+        
+    def get(self, key, factory_func=None):
+        """Get widget from cache or create new one."""
+        if key in self._cache:
+            self._access_times[key] = time.time()
+            return self._cache[key]
+            
+        if factory_func:
+            widget = factory_func()
+            self.put(key, widget)
+            return widget
+            
+        return None
+        
+    def put(self, key, widget):
+        """Put widget in cache with LRU eviction."""
+        if len(self._cache) >= self._max_size:
+            # Remove least recently used
+            oldest_key = min(self._access_times.keys(), 
+                           key=lambda k: self._access_times[k])
+            self.remove(oldest_key)
+            
+        self._cache[key] = widget
+        self._access_times[key] = time.time()
+        
+    def remove(self, key):
+        """Remove widget from cache."""
+        if key in self._cache:
+            del self._cache[key]
+            del self._access_times[key]
+            
+    def clear(self):
+        """Clear all cached widgets."""
+        self._cache.clear()
+        self._access_times.clear()
+
+
+# Global widget cache
+_widget_cache = WidgetCache()
+
+
 class ThemedWidget:
-    """Base class for theme-aware widgets."""
+    """Base class for theme-aware widgets with performance optimizations."""
     
     def __init__(self):
         self.theme = get_current_theme()
+        self._last_theme_update = time.time()
         
     def refresh_theme(self):
-        """Refresh the theme and update widget appearance."""
-        self.theme = get_current_theme()
-        self.apply_theme()
+        """Refresh the theme with throttling to prevent excessive updates."""
+        current_time = time.time()
+        if current_time - self._last_theme_update > 0.1:  # Throttle to 10 FPS
+            self.theme = get_current_theme()
+            self.apply_theme()
+            self._last_theme_update = current_time
         
     def apply_theme(self):
         """Apply theme to widget. Override in subclasses."""
         pass
 
 
-class OutputTextWidget(ThemedWidget):
-    """Custom output text widget with proper styling and tag configuration."""
+class OptimizedOutputTextWidget(ThemedWidget):
+    """
+    Optimized output text widget with memory management and performance improvements.
+    """
     
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.dimensions = UI_CONFIG["dimensions"]
         
-        # Create the scrolled text widget
+        # Performance optimizations
+        self._message_buffer = deque(maxlen=PERFORMANCE_CONFIG["max_output_lines"])
+        self._update_pending = False
+        self._last_update = time.time()
+        
+        # Create the scrolled text widget with optimizations
         self.widget = scrolledtext.ScrolledText(
             parent, 
             height=self.dimensions["output_height"], 
@@ -49,7 +112,9 @@ class OutputTextWidget(ThemedWidget):
             relief=tk.FLAT,
             borderwidth=1,
             font=("Consolas", 10),
-            selectbackground=self.theme["colors"]["primary"]
+            selectbackground=self.theme["colors"]["primary"],
+            undo=False,  # Disable undo for better performance
+            maxundo=0    # Disable undo stack
         )
         
         self.apply_theme()
@@ -57,7 +122,10 @@ class OutputTextWidget(ThemedWidget):
         self._initialize_content()
         
     def apply_theme(self):
-        """Apply current theme to the output widget."""
+        """Apply current theme to the output widget with optimizations."""
+        if not self.widget.winfo_exists():
+            return
+            
         self.widget.configure(
             fg=self.theme["content"]["output_fg"],
             bg=self.theme["content"]["output_bg"],
@@ -72,7 +140,15 @@ class OutputTextWidget(ThemedWidget):
         self._configure_tags()
         
     def _configure_tags(self):
-        """Configure text tags for different types of output."""
+        """Configure text tags for different types of output with caching."""
+        cache_key = f"tags_{id(self.theme)}"
+        cached_tags = _widget_cache.get(cache_key)
+        
+        if cached_tags:
+            for tag_name, tag_config in cached_tags.items():
+                self.widget.tag_config(tag_name, **tag_config)
+            return
+            
         # Theme-aware tag configurations
         theme_tags = {
             "error_tag": {
@@ -95,32 +171,65 @@ class OutputTextWidget(ThemedWidget):
             }
         }
         
-        # Apply theme-aware tags
+        # Apply and cache tags
         for tag_name, tag_config in theme_tags.items():
             self.widget.tag_config(tag_name, **tag_config)
             
+        _widget_cache.put(cache_key, theme_tags)
+            
     def _initialize_content(self):
         """Set initial content in the output widget."""
-        from config.settings import MESSAGES
         self.widget.configure(state='normal')
         self.widget.insert(tk.END, MESSAGES["initial_output"], "init_msg_visible_test")
         self.widget.configure(state='disabled')
         
     def write_message(self, message, tags=None):
-        """Write a message to the output widget."""
+        """Write a message to the output widget with batching for performance."""
         if not self.widget.winfo_exists():
             return
             
-        self.widget.configure(state='normal')
+        # Add to buffer for batched updates
+        self._message_buffer.append((message, tags, time.time()))
         
-        if tags == ("clear_previous",):
-            self.widget.delete(1.0, tk.END)
-        else:
-            effective_tags = tags if tags else ("stdout_tag",)
-            self.widget.insert(tk.END, message, effective_tags)
+        # Batch updates for better performance
+        current_time = time.time()
+        if (not self._update_pending and 
+            current_time - self._last_update > 0.05):  # 20 FPS max
+            self._update_pending = True
+            self.widget.after_idle(self._flush_messages)
             
-        self.widget.configure(state='disabled')
-        self.widget.see(tk.END)
+    def _flush_messages(self):
+        """Flush buffered messages to the widget."""
+        if not self.widget.winfo_exists():
+            return
+            
+        try:
+            self.widget.configure(state='normal')
+            
+            # Process all buffered messages
+            while self._message_buffer:
+                message, tags, timestamp = self._message_buffer.popleft()
+                
+                if tags == ("clear_previous",):
+                    self.widget.delete(1.0, tk.END)
+                else:
+                    effective_tags = tags if tags else ("stdout_tag",)
+                    self.widget.insert(tk.END, message, effective_tags)
+                    
+            # Limit total lines for memory management
+            lines = int(self.widget.index('end-1c').split('.')[0])
+            if lines > PERFORMANCE_CONFIG["max_output_lines"]:
+                excess_lines = lines - PERFORMANCE_CONFIG["max_output_lines"]
+                self.widget.delete(1.0, f"{excess_lines}.0")
+                    
+            self.widget.configure(state='disabled')
+            self.widget.see(tk.END)
+            
+        except tk.TclError:
+            pass
+        finally:
+            self._update_pending = False
+            self._last_update = time.time()
         
     def pack(self, **kwargs):
         """Pack the widget."""
@@ -128,7 +237,14 @@ class OutputTextWidget(ThemedWidget):
         
     def winfo_exists(self):
         """Check if widget exists."""
-        return self.widget.winfo_exists()
+        try:
+            return self.widget.winfo_exists()
+        except tk.TclError:
+            return False
+
+
+# Keep backward compatibility
+OutputTextWidget = OptimizedOutputTextWidget
 
 
 class ProjectTypeSelector(ThemedWidget):
