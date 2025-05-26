@@ -1,5 +1,6 @@
 """
 Sidebar-based main window for Project Runner App.
+Optimized for better performance and resource management.
 """
 
 import tkinter as tk
@@ -7,42 +8,167 @@ from tkinter import ttk, messagebox
 import queue
 import threading
 import os
+import time
+import gc
+import weakref
+from typing import Dict, Optional, Any
 
-from config.settings import UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, PROJECT_CONFIG, STATUS_CONFIG, get_current_theme, set_theme
+from config.settings import (UI_CONFIG, PROJECT_TYPES, PROCESS_CONFIG, MESSAGES, 
+                           PROJECT_CONFIG, STATUS_CONFIG, get_current_theme, set_theme,
+                           PERFORMANCE_CONFIG)
 from gui.widgets import CreateInstanceTab, ProjectInstanceTab, ProjectSidebar
 from core.process_manager import ProcessHandler, stream_output_worker, stop_process
 from core.port_manager import find_and_kill_process_on_port
 from core.database import get_database
 
 
-class MainWindow:
-    """Sidebar-based main window with project list and status indicators."""
+class OptimizedMainWindow:
+    """
+    Optimized main window with improved performance and resource management.
+    """
     
     def __init__(self):
         self.root = tk.Tk()
         self.root.title(UI_CONFIG["window_title"])
         self.root.geometry("1100x700")
         
-        # Database connection
-        self.db = get_database()
+        # Performance tracking
+        self._last_cleanup = time.time()
+        self._ui_update_queue = queue.Queue()
+        self._batch_updates = []
+        
+        # Database connection with lazy loading
+        self._db = None
         
         # Theme management
         self.theme = get_current_theme()
         self._load_saved_theme()
         
-        # Instance management
+        # Instance management with weak references for memory efficiency
         self.instances = {}  # project_id -> instance data
+        self._instance_refs = weakref.WeakValueDictionary()
         self.instance_counters = {"Angular": 0, "Laravel": 0, "Custom": 0}
         self.next_project_id = 1
         self.current_project_id = None
+        
+        # Performance optimization flags
+        self._ui_updates_paused = False
+        self._batch_update_timer = None
         
         # Create main layout
         self._create_layout()
         self._setup_window_events()
         self._apply_theme()
         
-        # Load saved projects
-        self._load_saved_projects()
+        # Start performance monitoring
+        self._start_performance_monitoring()
+        
+        # Load saved projects (lazy)
+        self.root.after(100, self._load_saved_projects)
+        
+    @property
+    def db(self):
+        """Lazy database initialization."""
+        if self._db is None:
+            self._db = get_database()
+        return self._db
+        
+    def _start_performance_monitoring(self):
+        """Start background performance monitoring."""
+        def monitor():
+            while True:
+                try:
+                    # Periodic cleanup
+                    if time.time() - self._last_cleanup > PERFORMANCE_CONFIG["memory_cleanup_interval"]:
+                        self._cleanup_memory()
+                        
+                    # Process batched UI updates
+                    self._process_ui_updates()
+                    
+                    time.sleep(1)  # Check every second
+                except Exception as e:
+                    print(f"Performance monitor error: {e}")
+                    
+        monitor_thread = threading.Thread(target=monitor, daemon=True)
+        monitor_thread.start()
+        
+    def _cleanup_memory(self):
+        """Perform memory cleanup operations."""
+        try:
+            # Clean up dead instance references
+            dead_ids = []
+            for project_id, instance in self.instances.items():
+                if (instance.get('instance_tab') and 
+                    not instance['instance_tab'].main_frame.winfo_exists()):
+                    dead_ids.append(project_id)
+                    
+            for project_id in dead_ids:
+                self._cleanup_instance(project_id)
+                
+            # Force garbage collection
+            gc.collect()
+            
+            # Update database maintenance
+            if hasattr(self, '_db') and self._db:
+                self._db.vacuum_database()
+                
+            self._last_cleanup = time.time()
+            
+        except Exception as e:
+            print(f"Memory cleanup error: {e}")
+            
+    def _cleanup_instance(self, project_id: int):
+        """Clean up a specific instance and its resources."""
+        if project_id in self.instances:
+            instance = self.instances[project_id]
+            
+            # Stop any running processes
+            if instance.get('process_handler'):
+                process_handler = instance['process_handler']
+                if process_handler.is_running():
+                    process_handler.reset()
+                    
+            # Clean up UI references
+            if instance.get('instance_tab'):
+                try:
+                    instance['instance_tab'].main_frame.destroy()
+                except tk.TclError:
+                    pass
+                    
+            del self.instances[project_id]
+            
+    def _process_ui_updates(self):
+        """Process batched UI updates for better performance."""
+        if self._ui_updates_paused:
+            return
+            
+        updates_processed = 0
+        max_updates = PERFORMANCE_CONFIG["ui_update_batch_size"]
+        
+        try:
+            while updates_processed < max_updates:
+                try:
+                    update_func = self._ui_update_queue.get_nowait()
+                    update_func()
+                    updates_processed += 1
+                except queue.Empty:
+                    break
+                except Exception as e:
+                    print(f"UI update error: {e}")
+                    
+        except Exception as e:
+            print(f"UI batch processing error: {e}")
+            
+    def _queue_ui_update(self, update_func):
+        """Queue a UI update for batch processing."""
+        try:
+            self._ui_update_queue.put_nowait(update_func)
+        except queue.Full:
+            # If queue is full, execute immediately
+            try:
+                update_func()
+            except Exception as e:
+                print(f"Immediate UI update error: {e}")
         
     def _create_layout(self):
         """Create the main layout with sidebar and content area."""
@@ -813,4 +939,8 @@ class MainWindow:
         self._restore_window_geometry()
         
         if self.root.winfo_exists():
-            self.root.mainloop() 
+            self.root.mainloop()
+
+
+# Keep backward compatibility
+MainWindow = OptimizedMainWindow 

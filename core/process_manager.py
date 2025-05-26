@@ -1,5 +1,6 @@
 """
 Process management functionality for executing and controlling commands.
+Optimized for better performance and resource management.
 """
 
 import subprocess
@@ -8,55 +9,138 @@ import platform
 import signal
 import os
 import traceback
-from config.settings import PROCESS_CONFIG
+import time
+import weakref
+from collections import deque
+from config.settings import PROCESS_CONFIG, PERFORMANCE_CONFIG
 
 
-class ProcessHandler:
-    """Manages a single running process and its associated threads."""
+class OptimizedProcessHandler:
+    """
+    Optimized process handler with better resource management and performance.
+    """
     
     def __init__(self):
         self.process = None
         self.thread = None
         self.stop_event = threading.Event()
         self.pgid = None
+        self._output_buffer = deque(maxlen=PERFORMANCE_CONFIG["max_output_lines"])
+        self._last_cleanup = time.time()
         
     def reset(self):
-        """Reset the handler for a new process."""
+        """Reset the handler and clean up resources."""
+        self._cleanup_resources()
         self.process = None
         self.thread = None
         self.pgid = None
         self.stop_event.clear()
+        self._output_buffer.clear()
         
+    def _cleanup_resources(self):
+        """Clean up system resources."""
+        if self.process:
+            try:
+                if self.process.poll() is None:
+                    self.process.terminate()
+                    self.process.wait(timeout=1)
+            except (subprocess.TimeoutExpired, ProcessLookupError):
+                try:
+                    self.process.kill()
+                except ProcessLookupError:
+                    pass
+            finally:
+                self.process = None
+                
+        if self.thread and self.thread.is_alive():
+            self.stop_event.set()
+            self.thread.join(timeout=PROCESS_CONFIG["thread_join_timeout"])
+            
     def is_running(self):
-        """Check if process is currently running."""
-        return (self.process and self.process.poll() is None) or \
-               (self.thread and self.thread.is_alive())
+        """Check if process is currently running with optimized checks."""
+        # Quick check first
+        if not self.process and not self.thread:
+            return False
+            
+        # More expensive checks only if needed
+        process_running = self.process and self.process.poll() is None
+        thread_running = self.thread and self.thread.is_alive()
+        
+        return process_running or thread_running
+        
+    def get_memory_usage(self):
+        """Get approximate memory usage of the process."""
+        if not self.process:
+            return 0
+        try:
+            import psutil
+            proc = psutil.Process(self.process.pid)
+            return proc.memory_info().rss
+        except (ImportError, psutil.NoSuchProcess):
+            return 0
+            
+    def should_cleanup(self):
+        """Check if cleanup is needed based on time interval."""
+        current_time = time.time()
+        if current_time - self._last_cleanup > PERFORMANCE_CONFIG["memory_cleanup_interval"]:
+            self._last_cleanup = current_time
+            return True
+        return False
+
+
+# Keep backward compatibility
+ProcessHandler = OptimizedProcessHandler
+
+
+class OutputBuffer:
+    """Optimized output buffer with memory management."""
+    
+    def __init__(self, max_size=PERFORMANCE_CONFIG["max_output_lines"]):
+        self._buffer = deque(maxlen=max_size)
+        self._lock = threading.Lock()
+        
+    def add(self, message, tags=None):
+        """Add message to buffer thread-safely."""
+        with self._lock:
+            self._buffer.append((message, tags, time.time()))
+            
+    def get_recent(self, count=None):
+        """Get recent messages from buffer."""
+        with self._lock:
+            if count is None:
+                return list(self._buffer)
+            return list(self._buffer)[-count:]
+            
+    def clear(self):
+        """Clear the buffer."""
+        with self._lock:
+            self._buffer.clear()
+            
+    def size(self):
+        """Get current buffer size."""
+        return len(self._buffer)
 
 
 def stream_output_worker(command_str, cwd_str, output_queue, stop_event_ref, process_handler):
     """
-    Worker function that runs in a separate thread to execute commands and stream output.
-    
-    Args:
-        command_str (str): Command to execute
-        cwd_str (str): Working directory
-        output_queue (queue.Queue): Queue for output messages
-        stop_event_ref (threading.Event): Event to signal stopping
-        process_handler (ProcessHandler): Handler to store process info
+    Optimized worker function with better resource management and performance.
     """
     process = None
     process_handler.pgid = None
+    output_buffer = OutputBuffer()
     
     try:
         output_queue.put((f"Attempting: {command_str} in {cwd_str}\n\n", ("info_tag",)))
         
-        # Configure process creation based on platform
+        # Configure process creation with optimizations
         start_new_session_flag = platform.system() != "Windows"
         
+        # Use optimized buffer size
         process = subprocess.Popen(
             command_str, shell=True, cwd=cwd_str,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, bufsize=1, universal_newlines=True, errors='replace',
+            text=True, bufsize=PERFORMANCE_CONFIG["output_buffer_size"], 
+            universal_newlines=True, errors='replace',
             start_new_session=start_new_session_flag
         )
         
@@ -72,36 +156,48 @@ def stream_output_worker(command_str, cwd_str, output_queue, stop_event_ref, pro
         pgid_info = f' (PGID: {process_handler.pgid})' if process_handler.pgid else ''
         output_queue.put((f"PID: {process.pid}{pgid_info}. Streaming output...\n{'-'*26}\n", ("info_tag",)))
 
-        # Start output streaming threads
+        # Start optimized output streaming threads
         stdout_thread = threading.Thread(
-            target=_enqueue_output, 
-            args=(process.stdout, "stdout", output_queue, stop_event_ref), 
+            target=_optimized_enqueue_output, 
+            args=(process.stdout, "stdout", output_queue, stop_event_ref, output_buffer), 
             daemon=True
         )
         stderr_thread = threading.Thread(
-            target=_enqueue_output, 
-            args=(process.stderr, "stderr", output_queue, stop_event_ref), 
+            target=_optimized_enqueue_output, 
+            args=(process.stderr, "stderr", output_queue, stop_event_ref, output_buffer), 
             daemon=True
         )
         
         stdout_thread.start()
         stderr_thread.start()
 
-        # Wait for process completion or stop signal
+        # Optimized waiting loop with periodic cleanup
+        last_cleanup = time.time()
         while not stop_event_ref.is_set():
             if process.poll() is not None:
                 break
             if not stdout_thread.is_alive() and not stderr_thread.is_alive():
                 break
+                
+            # Periodic cleanup to prevent memory leaks
+            current_time = time.time()
+            if current_time - last_cleanup > PERFORMANCE_CONFIG["memory_cleanup_interval"]:
+                _cleanup_dead_threads()
+                last_cleanup = current_time
+                
             stop_event_ref.wait(0.1)
 
-        # Clean up threads
+        # Clean up threads with timeout
         stdout_thread.join(timeout=PROCESS_CONFIG["thread_join_timeout"])
         stderr_thread.join(timeout=PROCESS_CONFIG["thread_join_timeout"])
         
         # Wait for natural completion if not stopped
         if process.poll() is None and not stop_event_ref.is_set():
-            process.wait()
+            try:
+                process.wait(timeout=PROCESS_CONFIG["process_kill_timeout"])
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
             
         return_code = process.returncode if process.poll() is not None else 'N/A (killed)'
         output_queue.put((f"\n--- Return code: {return_code} ---\n", ("info_tag",)))
@@ -111,36 +207,70 @@ def stream_output_worker(command_str, cwd_str, output_queue, stop_event_ref, pro
     except Exception as e:
         output_queue.put((f"WORKER ERROR: {str(e)}\n{traceback.format_exc()}\n", ("error_tag",)))
     finally:
-        # Final cleanup
-        if process and process.poll() is None and not stop_event_ref.is_set():
-            try:
-                process.kill()
-                process.wait(timeout=PROCESS_CONFIG["thread_join_timeout"])
-            except Exception:
-                pass
+        # Optimized cleanup
+        _cleanup_process(process, stop_event_ref)
         output_queue.put(("WORKER_THREAD_DONE", None))
 
 
-def _enqueue_output(stream, stream_type, output_queue, stop_event_ref):
+def _optimized_enqueue_output(stream, stream_type, output_queue, stop_event_ref, output_buffer):
     """
-    Read from a stream and put lines into the output queue.
-    
-    Args:
-        stream: The stream to read from (stdout or stderr)
-        stream_type (str): Type of stream ("stdout" or "stderr")
-        output_queue (queue.Queue): Queue to put output lines
-        stop_event_ref (threading.Event): Event to signal stopping
+    Optimized output reading with batching and memory management.
     """
     tag = "stderr_tag" if stream_type == "stderr" else "stdout_tag"
+    batch_buffer = []
+    batch_size = PERFORMANCE_CONFIG["ui_update_batch_size"]
+    
     try:
         for line in iter(stream.readline, ''):
             if stop_event_ref.is_set():
                 break
-            output_queue.put((line, (tag,)))
+                
+            # Add to output buffer for history
+            output_buffer.add(line, tag)
+            
+            # Batch output for better UI performance
+            batch_buffer.append((line, (tag,)))
+            
+            if len(batch_buffer) >= batch_size:
+                # Send batch to UI
+                for item in batch_buffer:
+                    output_queue.put(item)
+                batch_buffer.clear()
+                
+        # Send remaining items in batch
+        for item in batch_buffer:
+            output_queue.put(item)
+            
     except Exception:
         pass
     finally:
-        stream.close()
+        try:
+            stream.close()
+        except:
+            pass
+
+
+def _cleanup_process(process, stop_event_ref):
+    """Optimized process cleanup."""
+    if not process:
+        return
+        
+    try:
+        if process.poll() is None and not stop_event_ref.is_set():
+            process.terminate()
+            try:
+                process.wait(timeout=PROCESS_CONFIG["thread_join_timeout"])
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
+    except (ProcessLookupError, OSError):
+        pass
+
+
+def _cleanup_dead_threads():
+    """Clean up dead thread references to prevent memory leaks."""
+    import gc
+    gc.collect()
 
 
 def stop_process(process_handler, output_queue):
